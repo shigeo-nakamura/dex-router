@@ -1,0 +1,5 @@
+Flask==2.0.3
+gunicorn==21.2.0
+Werkzeug==2.0.3
+apexpro==1.1.8
+parsimonious==0.8.1
