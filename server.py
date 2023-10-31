@@ -4,7 +4,7 @@ import os
 from flask import Flask, request, jsonify
 from dex.apex import ApexDex
 
-EXPECTED_API_KEY = os.environ.get('API_KEY')
+EXPECTED_API_KEY = os.environ.get('ENCRYPTED_API_KEY')
 SUPPORTED_DEX_NAMES = ['apex']
 
 app = Flask(__name__)

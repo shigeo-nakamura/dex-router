@@ -8,20 +8,41 @@ from apexpro.http_private_stark_key_sign import HttpPrivateStark
 from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST
 from apexpro.helpers.util import round_size
 import time
+from .kms_decrypt import decrypt_data_with_kms
+
+def get_decrypted_env(name):
+    encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
+    encrypted_data = os.environ.get(f"ENCRYPTED_{name}")
+
+    if encrypted_key and encrypted_data:
+        is_hex = 'STARK_' in name
+        return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
+    else:
+        return None
 
 class ApexDex(AbstractDex):
 
     def __init__(self):
-        self.api_key = os.environ.get('API_KEY')
-        self.api_secret = os.environ.get('API_SECRET')
-        self.api_passphrase = os.environ.get('API_PASSPHRASE')
-        self.stark_public_key = os.environ.get('STARK_PUBLIC_KEY')
-        self.stark_public_key_y_coordinate = os.environ.get('STARK_PUBLIC_KEY_Y_COORDINATE')
-        self.stark_private_key = os.environ.get('STARK_PRIVATE_KEY')
+        env_vars = {
+            'API_KEY': get_decrypted_env('API_KEY'),
+            'API_SECRET': get_decrypted_env('API_SECRET'),
+            'API_PASSPHRASE': get_decrypted_env('API_PASSPHRASE'),
+            'STARK_PUBLIC_KEY': get_decrypted_env('STARK_PUBLIC_KEY'),
+            'STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env('STARK_PUBLIC_KEY_Y_COORDINATE'),
+            'STARK_PRIVATE_KEY': get_decrypted_env('STARK_PRIVATE_KEY'),
+        }
 
-        if None in [self.api_key, self.api_secret, self.api_passphrase, self.stark_public_key,
-                    self.stark_public_key_y_coordinate, self.stark_private_key]:
-            raise EnvironmentError("Required environment variables are not set")
+        missing_vars = [key for key, value in env_vars.items() if value is None]
+
+        if missing_vars:
+            raise EnvironmentError(f"Required environment variables are not set: {', '.join(missing_vars)}")
+
+        self.api_key = env_vars['API_KEY']
+        self.api_secret = env_vars['API_SECRET']
+        self.api_passphrase = env_vars['API_PASSPHRASE']
+        self.stark_public_key = env_vars['STARK_PUBLIC_KEY']
+        self.stark_public_key_y_coordinate = env_vars['STARK_PUBLIC_KEY_Y_COORDINATE']
+        self.stark_private_key = env_vars['STARK_PRIVATE_KEY']
 
         self.client = HttpPrivateStark(
             APEX_HTTP_TEST,
