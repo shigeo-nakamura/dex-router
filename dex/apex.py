@@ -5,7 +5,7 @@ import os
 from flask.json import jsonify
 from .abstract_dex import AbstractDex
 from apexpro.http_private_stark_key_sign import HttpPrivateStark
-from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST
+from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST, APEX_HTTP_MAIN, NETWORKID_MAIN
 from apexpro.helpers.util import round_size
 import time
 from .kms_decrypt import decrypt_data_with_kms
@@ -21,19 +21,19 @@ def get_decrypted_env(name):
         return None
 
 class ApexDex(AbstractDex):
+    def __init__(self, env_mode="TESTNET"):
+        suffix = "_MAIN" if env_mode == "MAINNET" else "_TEST"
 
-    def __init__(self):
         env_vars = {
-            'API_KEY': get_decrypted_env('API_KEY'),
-            'API_SECRET': get_decrypted_env('API_SECRET'),
-            'API_PASSPHRASE': get_decrypted_env('API_PASSPHRASE'),
-            'STARK_PUBLIC_KEY': get_decrypted_env('STARK_PUBLIC_KEY'),
-            'STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env('STARK_PUBLIC_KEY_Y_COORDINATE'),
-            'STARK_PRIVATE_KEY': get_decrypted_env('STARK_PRIVATE_KEY'),
+            'API_KEY': get_decrypted_env(f'API_KEY{suffix}'),
+            'API_SECRET': get_decrypted_env(f'API_SECRET{suffix}'),
+            'API_PASSPHRASE': get_decrypted_env(f'API_PASSPHRASE{suffix}'),
+            'STARK_PUBLIC_KEY': get_decrypted_env(f'STARK_PUBLIC_KEY{suffix}'),
+            'STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env(f'STARK_PUBLIC_KEY_Y_COORDINATE{suffix}'),
+            'STARK_PRIVATE_KEY': get_decrypted_env(f'STARK_PRIVATE_KEY{suffix}'),
         }
 
         missing_vars = [key for key, value in env_vars.items() if value is None]
-
         if missing_vars:
             raise EnvironmentError(f"Required environment variables are not set: {', '.join(missing_vars)}")
 
@@ -44,9 +44,16 @@ class ApexDex(AbstractDex):
         self.stark_public_key_y_coordinate = env_vars['STARK_PUBLIC_KEY_Y_COORDINATE']
         self.stark_private_key = env_vars['STARK_PRIVATE_KEY']
 
+        if env_mode == "MAINNET":
+            apex_http = APEX_HTTP_MAIN
+            network_id = NETWORKID_MAIN
+        else:
+            apex_http = APEX_HTTP_TEST
+            network_id = NETWORKID_TEST
+
         self.client = HttpPrivateStark(
-            APEX_HTTP_TEST,
-            network_id=NETWORKID_TEST,
+            apex_http,
+            network_id=network_id,
             stark_public_key=self.stark_public_key,
             stark_private_key=self.stark_private_key,
             stark_public_key_y_coordinate=self.stark_public_key_y_coordinate,

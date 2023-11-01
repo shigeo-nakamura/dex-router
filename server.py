@@ -4,11 +4,16 @@ import os
 from flask import Flask, request, jsonify
 from dex.apex import ApexDex
 
-EXPECTED_API_KEY = os.environ.get('ENCRYPTED_API_KEY')
-SUPPORTED_DEX_NAMES = ['apex']
 
 app = Flask(__name__)
-dex = ApexDex()
+
+env_mode = os.environ.get("ENV_MODE", "TESTNET").upper()
+if env_mode == "TESTNET":
+      EXPECTED_API_KEY = os.environ.get('ENCRYPTED_API_KEY_TEST')
+
+dex = ApexDex(env_mode)
+
+SUPPORTED_DEX_NAMES = ['apex']
 
 
 @app.before_request
