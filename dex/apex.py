@@ -108,5 +108,6 @@ class ApexDex(AbstractDex):
 
         return jsonify({
             'result': 'Ok',
-            'price': ret['data']['price']
+            'price': ret['data']['price'],
+            'size': ret['data']['size'],
         })
