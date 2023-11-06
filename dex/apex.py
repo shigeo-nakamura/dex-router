@@ -69,16 +69,40 @@ class ApexDex(AbstractDex):
 
     def get_ticker(self, symbol: str):
         ret = self.client.ticker(symbol=symbol)
-        return jsonify({
-            'symbol': symbol,
-            'price': ret['data'][0]['lastPrice']
-        })
+
+        if 'data' in ret and ret['data']:
+            data_first_item = ret['data'][0]
+
+            if 'lastPrice' in data_first_item:
+                return jsonify({
+                    'result': 'Ok',
+                    'symbol': symbol,
+                    'price': data_first_item['lastPrice']
+               })
+            else:
+                return jsonify({
+                  'result': 'Err',
+                 'message': 'lastPrice information is missing in the response'
+                })
+        else:
+            return jsonify({
+                'result': 'Err',
+                'message': 'Data is missing in the response'
+            })
 
     def get_yesterday_pnl(self):
-        ret = get_yesterday_pnl_res = self.client.yesterday_pnl()
-        return jsonify({
-		    'data': ret['data']
-	    })
+        ret = self.client.yesterday_pnl()
+
+        if 'data' in ret:
+            return jsonify({
+                'result': 'Ok',
+                'data': ret['data']
+            })
+        else:
+            return jsonify({
+                'result': 'Err',
+                'message': 'Data is missing in the response'
+            })
 
     def create_order(self, symbol: str, size: str, side: str):
         worstPrice = self.client.get_worst_price(symbol=symbol, side=side, size=size)
