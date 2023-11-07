@@ -2,13 +2,14 @@
 
 import os
 
-from flask.json import jsonify
+from flask import make_response, jsonify
 from .abstract_dex import AbstractDex
 from apexpro.http_private_stark_key_sign import HttpPrivateStark
 from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST, APEX_HTTP_MAIN, NETWORKID_MAIN
 from apexpro.helpers.util import round_size
 import time
 from .kms_decrypt import decrypt_data_with_kms
+import requests
 
 def get_decrypted_env(name):
     encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
@@ -95,6 +96,17 @@ class ApexDex(AbstractDex):
                     'result': 'Err',
                     'message': error_message
                 }), 400)
+
+        except requests.exceptions.JSONDecodeError as e:
+            print(f"JSONDecodeError: {e}")
+            response_content = e.response.text if e.response else 'No content'
+            status_code = e.response.status_code if e.response else 'No status code'
+            print(f"HTTP Response Content: {response_content}")
+            print(f"HTTP Status Code: {status_code}")
+            return make_response(jsonify({
+                'result': 'Err',
+                'message': f"Could not decode JSON, HTTP Status Code: {status_code}, Content: {response_content}"
+            }), 500)
 
         except Exception as e:
             print(f"Unexpected error: {e}")
