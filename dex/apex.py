@@ -68,29 +68,40 @@ class ApexDex(AbstractDex):
         self.client.get_account()
 
     def get_ticker(self, symbol: str):
-        ret = self.client.ticker(symbol=symbol)
+        try:
+            ret = self.client.ticker(symbol=symbol)
 
-        if 'data' in ret and ret['data']:
-            data_first_item = ret['data'][0]
+            if 'data' in ret and ret['data']:
+                data_first_item = ret['data'][0]
 
-            if 'lastPrice' in data_first_item:
-                return jsonify({
-                    'result': 'Ok',
-                    'symbol': symbol,
-                    'price': data_first_item['lastPrice']
-               })
+                if 'lastPrice' in data_first_item:
+                    return jsonify({
+                        'result': 'Ok',
+                        'symbol': symbol,
+                        'price': data_first_item['lastPrice']
+                    })
+                else:
+                    error_message = 'lastPrice information is missing in the response'
+                    print(error_message, ret)
+                    return make_response(jsonify({
+                        'result': 'Err',
+                        'message': error_message
+                    }), 400)
+
             else:
-                print(ret)
-                return jsonify({
-                  'result': 'Err',
-                 'message': 'lastPrice information is missing in the response'
-                })
-        else:
-            print(ret)
-            return jsonify({
+                error_message = 'Data is missing in the response'
+                print(error_message, ret)
+                return make_response(jsonify({
+                    'result': 'Err',
+                    'message': error_message
+                }), 400)
+
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            return make_response(jsonify({
                 'result': 'Err',
-                'message': 'Data is missing in the response'
-            })
+                'message': str(e)
+            }), 500)
 
     def get_yesterday_pnl(self):
         ret = self.client.yesterday_pnl()
@@ -107,32 +118,40 @@ class ApexDex(AbstractDex):
             })
 
     def create_order(self, symbol: str, size: str, side: str):
-        worstPrice = self.client.get_worst_price(symbol=symbol, side=side, size=size)
-        price = worstPrice['data']['worstPrice']
-        currentTime = time.time()
-        limitFeeRate = self.client.account['takerFeeRate']
+        try:
+            worstPrice = self.client.get_worst_price(symbol=symbol, side=side, size=size)
+            price = worstPrice['data']['worstPrice']
+            currentTime = time.time()
+            limitFeeRate = self.client.account['takerFeeRate']
 
-        symbolData = {}
-        for k, v in enumerate(self.configs.get('data').get('perpetualContract')):
-            if v.get('symbol') == "BTC-USDC":
-                symbolData = v
+            symbolData = {}
+            for k, v in enumerate(self.configs.get('data').get('perpetualContract')):
+                if v.get('symbol') == symbol:
+                    symbolData = v
+                    break
 
-        rounded_size = round_size(size, symbolData.get('stepSize'))
-        rounded_price = round_size(price, symbolData.get('tickSize'))
+            rounded_size = round_size(size, symbolData.get('stepSize'))
+            rounded_price = round_size(price, symbolData.get('tickSize'))
 
-        ret = self.client.create_order(symbol=symbol, side=side,
-                                            type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
-                                            expirationEpochSeconds= currentTime )
+            ret = self.client.create_order(symbol=symbol, side=side,
+                                        type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
+                                        expirationEpochSeconds=currentTime)
 
-        # Check if the response contains the 'code' key which indicates an error
-        if 'code' in ret:
+            if 'code' in ret:
+                return make_response(jsonify({
+                    'result': 'Err',
+                    'message': ret.get('msg', '')
+                }), 400)
+
             return jsonify({
-                'result': 'Err',
-                'message': ret.get('msg', '')  # This will return the error message if present, or an empty string if not
+                'result': 'Ok',
+                'price': ret['data']['price'],
+                'size': ret['data']['size'],
             })
 
-        return jsonify({
-            'result': 'Ok',
-            'price': ret['data']['price'],
-            'size': ret['data']['size'],
-        })
+        except Exception as e:
+            print(f"An error occurred in create_order: {e}")
+            return make_response(jsonify({
+                'result': 'Err',
+                'message': str(e)
+            }), 500)
