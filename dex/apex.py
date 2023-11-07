@@ -80,11 +80,13 @@ class ApexDex(AbstractDex):
                     'price': data_first_item['lastPrice']
                })
             else:
+                print(ret)
                 return jsonify({
                   'result': 'Err',
                  'message': 'lastPrice information is missing in the response'
                 })
         else:
+            print(ret)
             return jsonify({
                 'result': 'Err',
                 'message': 'Data is missing in the response'
@@ -121,7 +123,6 @@ class ApexDex(AbstractDex):
         ret = self.client.create_order(symbol=symbol, side=side,
                                             type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
                                             expirationEpochSeconds= currentTime )
-        print(ret)
 
         # Check if the response contains the 'code' key which indicates an error
         if 'code' in ret:
