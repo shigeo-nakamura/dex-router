@@ -11,6 +11,7 @@ import time
 from .kms_decrypt import decrypt_data_with_kms
 import requests
 
+
 def get_decrypted_env(name):
     encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
     encrypted_data = os.environ.get(f"ENCRYPTED_{name}")
@@ -20,6 +21,7 @@ def get_decrypted_env(name):
         return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
     else:
         return None
+
 
 class ApexDex(AbstractDex):
     def __init__(self, env_mode="TESTNET"):
@@ -34,9 +36,11 @@ class ApexDex(AbstractDex):
             'STARK_PRIVATE_KEY': get_decrypted_env(f'STARK_PRIVATE_KEY{suffix}'),
         }
 
-        missing_vars = [key for key, value in env_vars.items() if value is None]
+        missing_vars = [key for key, value in env_vars.items()
+                        if value is None]
         if missing_vars:
-            raise EnvironmentError(f"Required environment variables are not set: {', '.join(missing_vars)}")
+            raise EnvironmentError(
+                f"Required environment variables are not set: {', '.join(missing_vars)}")
 
         self.api_key = env_vars['API_KEY']
         self.api_secret = env_vars['API_SECRET']
@@ -131,7 +135,8 @@ class ApexDex(AbstractDex):
 
     def create_order(self, symbol: str, size: str, side: str):
         try:
-            worstPrice = self.client.get_worst_price(symbol=symbol, side=side, size=size)
+            worstPrice = self.client.get_worst_price(
+                symbol=symbol, side=side, size=size)
             price = worstPrice['data']['worstPrice']
             currentTime = time.time()
             limitFeeRate = self.client.account['takerFeeRate']
@@ -146,8 +151,8 @@ class ApexDex(AbstractDex):
             rounded_price = round_size(price, symbolData.get('tickSize'))
 
             ret = self.client.create_order(symbol=symbol, side=side,
-                                        type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
-                                        expirationEpochSeconds=currentTime)
+                                           type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
+                                           expirationEpochSeconds=currentTime)
 
             if 'code' in ret:
                 return make_response(jsonify({

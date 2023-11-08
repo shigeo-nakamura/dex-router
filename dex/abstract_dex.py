@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 
+
 class AbstractDex(ABC):
 
     @abstractmethod
@@ -15,4 +16,3 @@ class AbstractDex(ABC):
     @abstractmethod
     def create_order(self, symbol: str, size: str, side: str):
         pass
-
