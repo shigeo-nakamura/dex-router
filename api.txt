@@ -9,7 +9,7 @@ symbol,	string
 price, string
 
 e.g.
-curl -H "Authorization: YOUR_API_KEY" "http://127.0.0.1:5000/ticker?symbol=BTC-USDC"
+curl -H "Authorization: YOUR_API_KEY" "http://127.0.0.1:5000/ticker?symbol=BTC-USDC&dex=apex"
 
 -------------------------------------------------
 
@@ -22,7 +22,7 @@ Response  Parameters:
 data, string
 
 e.g.
-curl -H "Authorization: YOUR_API_KEY" "http://127.0.0.1:5000/yesterday-pnl"
+curl -H "Authorization: YOUR_API_KEY" "http://127.0.0.1:5000/yesterday-pnl?dex=apex"
 
 -------------------------------------------------
 
@@ -40,4 +40,4 @@ price, string
 size, string
 
 e.g.
-curl -H "Authorization: YOUR_API_KEY" -X POST "http://127.0.0.1:5000/create-order" -H "Content-Type: application/json" -d '{"symbol":"BTC-USDC","size":"0.01","side":"BUY"}'
+curl -H "Authorization: YOUR_API_KEY" -X POST "http://127.0.0.1:5000/create-order?dex=apex" -H "Content-Type: application/json" -d '{"symbol":"BTC-USDC","size":"0.01","side":"BUY"}'

@@ -71,10 +71,21 @@ class ApexDex(AbstractDex):
         self.configs = self.client.configs()
         self.client.get_user()
         self.client.get_account()
+        self.apex_http = apex_http
 
     def get_ticker(self, symbol: str):
+        endpoint = "/api/v1/ticker"
+        symbol_without_hyphen = symbol.replace("-", "")
+        params = {'symbol': symbol_without_hyphen}
+
+        request_url = f"{self.apex_http}{endpoint}"
+        # print(f"Requesting URL: {request_url} with params: {params}")
+
         try:
-            ret = self.client.ticker(symbol=symbol)
+            # Send the GET request with the constructed URL and params
+            response = requests.get(request_url, params=params)
+            response.raise_for_status()  # This will raise an exception for HTTP error responses
+            ret = response.json()
 
             if 'data' in ret and ret['data']:
                 data_first_item = ret['data'][0]
