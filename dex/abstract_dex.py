@@ -16,3 +16,7 @@ class AbstractDex(ABC):
     @abstractmethod
     def create_order(self, symbol: str, size: str, side: str):
         pass
+
+    @abstractmethod
+    def close_all_positions(self, symbol: str):
+        pass

@@ -183,3 +183,36 @@ class ApexDex(AbstractDex):
                 'result': 'Err',
                 'message': str(e)
             }), 500)
+
+    def close_all_positions(self, close_symbol):
+        account_data = self.client.get_account()
+        position_sizes = {}
+
+        for position in account_data['data']['openPositions']:
+            symbol = position['symbol']
+            side = position['side']
+            size_str = position['size']
+            size_float = float(position['size'])
+
+            if size_float != 0:
+                key = f"{symbol}_{side}"
+                position_sizes[key] = size_str
+
+        try:
+            for key, size in position_sizes.items():
+                symbol, side = key.split('_')
+                if close_symbol == "" or symbol == close_symbol:
+                    opposite_order_side = 'SELL' if side == 'LONG' else 'BUY'
+                    print("opposite_order_side:", opposite_order_side)
+                    self.create_order(symbol, size, opposite_order_side)
+
+            return jsonify({
+                'result': 'Ok',
+            })
+
+        except Exception as e:
+            print(f"An error occurred in close_all_positions: {e}")
+            return make_response(jsonify({
+                'result': 'Err',
+                'message': str(e)
+            }), 500)

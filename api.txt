@@ -41,3 +41,17 @@ size, string
 
 e.g.
 curl -H "Authorization: YOUR_API_KEY" -X POST "http://127.0.0.1:5000/create-order?dex=apex" -H "Content-Type: application/json" -d '{"symbol":"BTC-USDC","size":"0.01","side":"BUY"}'
+
+-------------------------------------------------
+
+POST /close_all_positions
+
+Request Parameters:
+dex, query, string
+symbol,	body, string
+
+Response  Parameters:
+result, string
+
+e.g.
+curl -H "Authorization: YOUR_API_KEY" -X POST "http://127.0.0.1:5000/close_all_positions?dex=apex" -H "Content-Type: application/json" -d '{"symbol":"BTC-USDC"}'
