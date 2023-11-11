@@ -193,8 +193,14 @@ class ApexDex(AbstractDex):
                 symbol, side = key.split('_')
                 if close_symbol == "" or symbol == close_symbol:
                     opposite_order_side = 'SELL' if side == 'LONG' else 'BUY'
-                    print("opposite_order_side:", opposite_order_side)
-                    self.create_order(symbol, size, opposite_order_side)
+
+                ticker_response = self.get_ticker(symbol)
+                if ticker_response.status_code == 200:
+                    price_data = ticker_response.json()
+                    price = price_data['price']
+                else:
+                    price = None
+                    self.create_order(symbol, size, opposite_order_side, price)
 
             return jsonify({
             })
