@@ -12,6 +12,8 @@ from .kms_decrypt import decrypt_data_with_kms
 import requests
 from typing import Optional
 
+TICK_SIZE_MULTIPLIER = 5
+
 
 def get_decrypted_env(name):
     encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
@@ -22,6 +24,7 @@ def get_decrypted_env(name):
         return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
     else:
         return None
+
 
 class ApexDex(AbstractDex):
     def __init__(self, env_mode="TESTNET"):
@@ -136,6 +139,21 @@ class ApexDex(AbstractDex):
                 'message': 'Data is missing in the response'
             }), 500)
 
+    def modify_price_for_instant_fill(self, symbol: str, side: str, price: str):
+        symbolData = {}
+        for k, v in enumerate(self.configs.get('data').get('perpetualContract')):
+            if v.get('symbol') == symbol:
+                symbolData = v
+                break
+
+        price_float = float(price)
+        tick_size_float = float(symbolData.get('tickSize'))
+        if side == 'BUY':
+            price_float += tick_size_float * TICK_SIZE_MULTIPLIER
+        else:
+            price_float -= tick_size_float * TICK_SIZE_MULTIPLIER
+        return str(price_float)
+
     def create_order(self, symbol: str, size: str, side: str, price: Optional[str]):
         try:
             if price is None:
@@ -154,8 +172,11 @@ class ApexDex(AbstractDex):
             rounded_size = round_size(size, symbolData.get('stepSize'))
             rounded_price = round_size(price, symbolData.get('tickSize'))
 
+            adjusted_price = self.modify_price_for_instant_fill(
+                symbol, side, rounded_price)
+
             ret = self.client.create_order(symbol=symbol, side=side,
-                                           type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
+                                           type="MARKET", size=rounded_size, price=adjusted_price, limitFeeRate=limitFeeRate,
                                            expirationEpochSeconds=currentTime)
 
             if 'code' in ret:
@@ -196,11 +217,12 @@ class ApexDex(AbstractDex):
 
                 ticker_response = self.get_ticker(symbol)
                 if ticker_response.status_code == 200:
-                    price_data = ticker_response.json()
-                    price = price_data['price']
+                    price_data = ticker_response.get_json()
+                    price = price_data.get('price', None)
                 else:
                     price = None
-                    self.create_order(symbol, size, opposite_order_side, price)
+
+                self.create_order(symbol, size, opposite_order_side, price)
 
             return jsonify({
             })
