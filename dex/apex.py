@@ -79,7 +79,6 @@ class ApexDex(AbstractDex):
         params = {'symbol': symbol_without_hyphen}
 
         request_url = f"{self.apex_http}{endpoint}"
-        # print(f"Requesting URL: {request_url} with params: {params}")
 
         try:
             # Send the GET request with the constructed URL and params
@@ -92,7 +91,6 @@ class ApexDex(AbstractDex):
 
                 if 'lastPrice' in data_first_item:
                     return jsonify({
-                        'result': 'Ok',
                         'symbol': symbol,
                         'price': data_first_item['lastPrice']
                     })
@@ -100,17 +98,15 @@ class ApexDex(AbstractDex):
                     error_message = 'lastPrice information is missing in the response'
                     print(error_message, ret)
                     return make_response(jsonify({
-                        'result': 'Err',
                         'message': error_message
-                    }), 400)
+                    }), 500)
 
             else:
                 error_message = 'Data is missing in the response'
                 print(error_message, ret)
                 return make_response(jsonify({
-                    'result': 'Err',
                     'message': error_message
-                }), 400)
+                }), 500)
 
         except requests.exceptions.JSONDecodeError as e:
             print(f"JSONDecodeError: {e}")
@@ -119,14 +115,12 @@ class ApexDex(AbstractDex):
             print(f"HTTP Response Content: {response_content}")
             print(f"HTTP Status Code: {status_code}")
             return make_response(jsonify({
-                'result': 'Err',
                 'message': f"Could not decode JSON, HTTP Status Code: {status_code}, Content: {response_content}"
             }), 500)
 
         except Exception as e:
             print(f"Unexpected error: {e}")
             return make_response(jsonify({
-                'result': 'Err',
                 'message': str(e)
             }), 500)
 
@@ -135,14 +129,12 @@ class ApexDex(AbstractDex):
 
         if 'data' in ret:
             return jsonify({
-                'result': 'Ok',
                 'data': ret['data']
             })
         else:
-            return jsonify({
-                'result': 'Err',
+            return make_response(jsonify({
                 'message': 'Data is missing in the response'
-            })
+            }), 500)
 
     def create_order(self, symbol: str, size: str, side: str):
         try:
@@ -167,12 +159,10 @@ class ApexDex(AbstractDex):
 
             if 'code' in ret:
                 return make_response(jsonify({
-                    'result': 'Err',
                     'message': ret.get('msg', '')
-                }), 400)
+                }), 500)
 
             return jsonify({
-                'result': 'Ok',
                 'price': ret['data']['price'],
                 'size': ret['data']['size'],
             })
@@ -180,7 +170,6 @@ class ApexDex(AbstractDex):
         except Exception as e:
             print(f"An error occurred in create_order: {e}")
             return make_response(jsonify({
-                'result': 'Err',
                 'message': str(e)
             }), 500)
 
@@ -207,12 +196,10 @@ class ApexDex(AbstractDex):
                     self.create_order(symbol, size, opposite_order_side)
 
             return jsonify({
-                'result': 'Ok',
             })
 
         except Exception as e:
             print(f"An error occurred in close_all_positions: {e}")
             return make_response(jsonify({
-                'result': 'Err',
                 'message': str(e)
             }), 500)
