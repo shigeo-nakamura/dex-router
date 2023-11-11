@@ -67,8 +67,9 @@ def create_order():
     symbol = data.get('symbol')
     size = data.get('size')
     side = data.get('side')
+    price = data.get('price')
 
-    return dex.create_order(symbol, size, side)
+    return dex.create_order(symbol, size, side, price)
 
 
 # POST /close_all_positions

@@ -10,6 +10,7 @@ from apexpro.helpers.util import round_size
 import time
 from .kms_decrypt import decrypt_data_with_kms
 import requests
+from typing import Optional
 
 
 def get_decrypted_env(name):
@@ -21,7 +22,6 @@ def get_decrypted_env(name):
         return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
     else:
         return None
-
 
 class ApexDex(AbstractDex):
     def __init__(self, env_mode="TESTNET"):
@@ -136,11 +136,12 @@ class ApexDex(AbstractDex):
                 'message': 'Data is missing in the response'
             }), 500)
 
-    def create_order(self, symbol: str, size: str, side: str):
+    def create_order(self, symbol: str, size: str, side: str, price: Optional[str]):
         try:
-            worstPrice = self.client.get_worst_price(
-                symbol=symbol, side=side, size=size)
-            price = worstPrice['data']['worstPrice']
+            if price is None:
+                worstPrice = self.client.get_worst_price(
+                    symbol=symbol, side=side, size=size)
+                price = worstPrice['data']['worstPrice']
             currentTime = time.time()
             limitFeeRate = self.client.account['takerFeeRate']
 

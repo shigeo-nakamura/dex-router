@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class AbstractDex(ABC):
@@ -14,7 +15,7 @@ class AbstractDex(ABC):
         pass
 
     @abstractmethod
-    def create_order(self, symbol: str, size: str, side: str):
+    def create_order(self, symbol: str, size: str, side: str, price: Optional[str]):
         pass
 
     @abstractmethod

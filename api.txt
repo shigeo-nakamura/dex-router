@@ -33,6 +33,7 @@ dex, query, string
 symbol,	body, string
 size, body, string,
 side, body, string,
+price, body, string(optional)
 
 Response  Parameters:
 result, string
