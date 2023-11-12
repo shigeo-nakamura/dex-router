@@ -116,17 +116,22 @@ class ApexDex(AbstractDex):
                 'message': str(e)
             }), 500)
 
-    def get_yesterday_pnl(self):
-        ret = self.client.yesterday_pnl()
+    def get_balance(self):
+        ret = self.client.get_account_balance()
 
         if 'data' in ret:
-            return jsonify({
-                'data': ret['data']
-            })
-        else:
-            return make_response(jsonify({
-                'message': 'Data is missing in the response'
-            }), 500)
+            required_keys = ['totalEquityValue', 'availableBalance']
+            data = ret['data']
+
+            if all(key in data for key in required_keys):
+                return jsonify({
+                    'equity': data['totalEquityValue'],
+                    'balance': data['availableBalance'],
+                })
+
+        return make_response(jsonify({
+            'message': 'Some required data is missing in the response'
+        }), 500)
 
     def modify_price_for_instant_fill(self, symbol: str, side: str, price: str):
         symbolData = {}

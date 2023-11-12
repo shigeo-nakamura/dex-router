@@ -11,7 +11,7 @@ class AbstractDex(ABC):
         pass
 
     @abstractmethod
-    def get_yesterday_pnl(self):
+    def get_balance(self):
         pass
 
     @abstractmethod

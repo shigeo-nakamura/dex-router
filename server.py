@@ -46,10 +46,10 @@ def get_ticker():
     return dex.get_ticker(symbol)
 
 
-# GET /yesterday-pnl
-@app.route('/yesterday-pnl', methods=['GET'])
-def get_yesterday_pnl():
-    return dex.get_yesterday_pnl()
+# GET /get-balance
+@app.route('/get-balance', methods=['GET'])
+def get_balance():
+    return dex.get_balance()
 
 
 # POST /create-order
