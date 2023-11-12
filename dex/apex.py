@@ -8,22 +8,11 @@ from apexpro.http_private_stark_key_sign import HttpPrivateStark
 from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST, APEX_HTTP_MAIN, NETWORKID_MAIN
 from apexpro.helpers.util import round_size
 import time
-from .kms_decrypt import decrypt_data_with_kms
+from .kms_decrypt import get_decrypted_env
 import requests
 from typing import Optional
 
 TICK_SIZE_MULTIPLIER = 5
-
-
-def get_decrypted_env(name):
-    encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
-    encrypted_data = os.environ.get(f"ENCRYPTED_{name}")
-
-    if encrypted_key and encrypted_data:
-        is_hex = 'HEX_' in name
-        return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
-    else:
-        return None
 
 
 class ApexDex(AbstractDex):

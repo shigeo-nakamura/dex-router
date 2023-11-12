@@ -3,16 +3,14 @@
 import os
 from flask import Flask, request, jsonify
 from dex.apex import ApexDex
-
+from dex.kms_decrypt import get_decrypted_env
 
 app = Flask(__name__)
 
 env_mode = os.environ.get("ENV_MODE", "TESTNET").upper()
-if env_mode == "TESTNET":
-    EXPECTED_ROUTER_API_KEY = os.environ.get('ENCRYPTED_ROUTER_KEY_TEST')
-
 dex = ApexDex(env_mode)
 
+DEX_ROUTER_API_KEY = get_decrypted_env('DEX_ROUTER_API_KEY')
 SUPPORTED_DEX_NAMES = ['apex']
 
 
@@ -21,7 +19,7 @@ def check_api_key():
     api_key = request.headers.get('Authorization')
     if api_key is None:
         return jsonify({"message": "API key missing"}), 401
-    elif api_key != f"{EXPECTED_ROUTER_API_KEY}":
+    elif api_key != f"{DEX_ROUTER_API_KEY}":
         return jsonify({"message": "Invalid API key"}), 401
 
 

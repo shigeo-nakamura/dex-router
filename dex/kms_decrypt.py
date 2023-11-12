@@ -57,6 +57,17 @@ def decrypt_data_with_kms(encrypted_data_key_str, encrypted_data_str, is_hex=Fal
         return unpadded_data.decode('utf-8')
 
 
+def get_decrypted_env(name):
+    encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
+    encrypted_data = os.environ.get(f"ENCRYPTED_{name}")
+
+    if encrypted_key and encrypted_data:
+        is_hex = 'HEX_' in name
+        return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
+    else:
+        return None
+
+
 if __name__ == '__main__':
     encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
 
