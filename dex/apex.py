@@ -20,7 +20,7 @@ def get_decrypted_env(name):
     encrypted_data = os.environ.get(f"ENCRYPTED_{name}")
 
     if encrypted_key and encrypted_data:
-        is_hex = 'STARK_' in name
+        is_hex = 'HEX_' in name
         return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
     else:
         return None
@@ -31,12 +31,12 @@ class ApexDex(AbstractDex):
         suffix = "_MAIN" if env_mode == "MAINNET" else "_TEST"
 
         env_vars = {
-            'API_KEY': get_decrypted_env(f'API_KEY{suffix}'),
-            'API_SECRET': get_decrypted_env(f'API_SECRET{suffix}'),
-            'API_PASSPHRASE': get_decrypted_env(f'API_PASSPHRASE{suffix}'),
-            'STARK_PUBLIC_KEY': get_decrypted_env(f'STARK_PUBLIC_KEY{suffix}'),
-            'STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env(f'STARK_PUBLIC_KEY_Y_COORDINATE{suffix}'),
-            'STARK_PRIVATE_KEY': get_decrypted_env(f'STARK_PRIVATE_KEY{suffix}'),
+            'APEX_API_KEY': get_decrypted_env(f'APEX_API_KEY{suffix}'),
+            'APEX_API_SECRET': get_decrypted_env(f'APEX_API_SECRET{suffix}'),
+            'APEX_API_PASSPHRASE': get_decrypted_env(f'APEX_API_PASSPHRASE{suffix}'),
+            'HEX_STARK_PUBLIC_KEY': get_decrypted_env(f'HEX_STARK_PUBLIC_KEY{suffix}'),
+            'HEX_STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env(f'HEX_STARK_PUBLIC_KEY_Y_COORDINATE{suffix}'),
+            'HEX_STARK_PRIVATE_KEY': get_decrypted_env(f'HEX_STARK_PRIVATE_KEY{suffix}'),
         }
 
         missing_vars = [key for key, value in env_vars.items()
@@ -45,12 +45,12 @@ class ApexDex(AbstractDex):
             raise EnvironmentError(
                 f"Required environment variables are not set: {', '.join(missing_vars)}")
 
-        self.api_key = env_vars['API_KEY']
-        self.api_secret = env_vars['API_SECRET']
-        self.api_passphrase = env_vars['API_PASSPHRASE']
-        self.stark_public_key = env_vars['STARK_PUBLIC_KEY']
-        self.stark_public_key_y_coordinate = env_vars['STARK_PUBLIC_KEY_Y_COORDINATE']
-        self.stark_private_key = env_vars['STARK_PRIVATE_KEY']
+        self.api_key = env_vars['APEX_API_KEY']
+        self.api_secret = env_vars['APEX_API_SECRET']
+        self.api_passphrase = env_vars['APEX_API_PASSPHRASE']
+        self.stark_public_key = env_vars['HEX_STARK_PUBLIC_KEY']
+        self.stark_public_key_y_coordinate = env_vars['HEX_STARK_PUBLIC_KEY_Y_COORDINATE']
+        self.stark_private_key = env_vars['HEX_STARK_PRIVATE_KEY']
 
         if env_mode == "MAINNET":
             apex_http = APEX_HTTP_MAIN

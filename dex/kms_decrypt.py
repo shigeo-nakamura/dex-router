@@ -60,10 +60,10 @@ def decrypt_data_with_kms(encrypted_data_key_str, encrypted_data_str, is_hex=Fal
 if __name__ == '__main__':
     encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
 
-    encrypted_data_val = os.environ.get("ENCRYPTED_API_KEY")
+    encrypted_data_val = os.environ.get("ENCRYPTED_APEX_API_KEY")
     decrypted = decrypt_data_with_kms(
         encrypted_key, encrypted_data_val, is_hex=False)
 
-    encrypted_data_val = os.environ.get("ENCRYPTED_STARK_PRIVATE_KEY")
+    encrypted_data_val = os.environ.get("ENCRYPTED_HEX_STARK_PRIVATE_KEY")
     decrypted = decrypt_data_with_kms(
         encrypted_key, encrypted_data_val, is_hex=True)

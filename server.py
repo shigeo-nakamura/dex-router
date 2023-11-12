@@ -9,7 +9,7 @@ app = Flask(__name__)
 
 env_mode = os.environ.get("ENV_MODE", "TESTNET").upper()
 if env_mode == "TESTNET":
-    EXPECTED_API_KEY = os.environ.get('ENCRYPTED_API_KEY_TEST')
+    EXPECTED_ROUTER_API_KEY = os.environ.get('ENCRYPTED_ROUTER_KEY_TEST')
 
 dex = ApexDex(env_mode)
 
@@ -21,7 +21,7 @@ def check_api_key():
     api_key = request.headers.get('Authorization')
     if api_key is None:
         return jsonify({"message": "API key missing"}), 401
-    elif api_key != f"{EXPECTED_API_KEY}":
+    elif api_key != f"{EXPECTED_ROUTER_API_KEY}":
         return jsonify({"message": "Invalid API key"}), 401
 
 
