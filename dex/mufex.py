@@ -1,31 +1,33 @@
 #!/usr/bin/env python3
 
+import hashlib
+import hmac
 import os
 
 from flask import make_response, jsonify
 from .abstract_dex import AbstractDex
-from apexpro.http_private_stark_key_sign import HttpPrivateStark
-from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST, APEX_HTTP_MAIN, NETWORKID_MAIN
-from apexpro.helpers.util import round_size
 import time
 from .kms_decrypt import get_decrypted_env
 import requests
 from typing import Optional
 
-TICK_SIZE_MULTIPLIER = 5
+MUFEX_HTTP_MAIN = "https://api.mufex.finance"
+MUFEX_HTTP_TEST = "https://api.testnet.mufex.finance"
 
+class MufexDex(AbstractDex):
+    def generate_signature(self, query_string='', json_body_string='', recv_window=5000):
+        """
+        Generate HMAC SHA256 signature.
+        """
+        timestamp = int(time.time() * 1000)
+        prehash = f"{timestamp}{self.api_key}{recv_window}{query_string}{json_body_string}"
+        signature = hmac.new(self.api_secret.encode(), prehash.encode(), hashlib.sha256).hexdigest()
+        return signature, timestamp, recv_window
 
-class ApexDex(AbstractDex):
     def __init__(self, env_mode="TESTNET"):
-        suffix = "_MAIN" if env_mode == "MAINNET" else "_TEST"
-
         env_vars = {
-            'APEX_API_KEY': get_decrypted_env(f'APEX_API_KEY{suffix}'),
-            'APEX_API_SECRET': get_decrypted_env(f'APEX_API_SECRET{suffix}'),
-            'APEX_API_PASSPHRASE': get_decrypted_env(f'APEX_API_PASSPHRASE{suffix}'),
-            'HEX_STARK_PUBLIC_KEY': get_decrypted_env(f'HEX_STARK_PUBLIC_KEY{suffix}'),
-            'HEX_STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env(f'HEX_STARK_PUBLIC_KEY_Y_COORDINATE{suffix}'),
-            'HEX_STARK_PRIVATE_KEY': get_decrypted_env(f'HEX_STARK_PRIVATE_KEY{suffix}'),
+            'MUFEX_API_KEY': get_decrypted_env(f'APEX_API_KEY'),
+            'MUFEX_API_SECRET': get_decrypted_env(f'APEX_API_SECRET'),
         }
 
         missing_vars = [key for key, value in env_vars.items()
@@ -34,47 +36,35 @@ class ApexDex(AbstractDex):
             raise EnvironmentError(
                 f"Required environment variables are not set: {', '.join(missing_vars)}")
 
-        self.api_key = env_vars['APEX_API_KEY']
-        self.api_secret = env_vars['APEX_API_SECRET']
-        self.api_passphrase = env_vars['APEX_API_PASSPHRASE']
-        self.stark_public_key = env_vars['HEX_STARK_PUBLIC_KEY']
-        self.stark_public_key_y_coordinate = env_vars['HEX_STARK_PUBLIC_KEY_Y_COORDINATE']
-        self.stark_private_key = env_vars['HEX_STARK_PRIVATE_KEY']
+        self.api_key = env_vars['MUFEX_API_KEY']
+        self.api_secret = env_vars['MUFEX_API_SECRET']
 
         if env_mode == "MAINNET":
-            apex_http = APEX_HTTP_MAIN
-            network_id = NETWORKID_MAIN
+            self.mufex_http = MUFEX_HTTP_MAIN
         else:
-            apex_http = APEX_HTTP_TEST
-            network_id = NETWORKID_TEST
-
-        self.client = HttpPrivateStark(
-            apex_http,
-            network_id=network_id,
-            stark_public_key=self.stark_public_key,
-            stark_private_key=self.stark_private_key,
-            stark_public_key_y_coordinate=self.stark_public_key_y_coordinate,
-            api_key_credentials={
-                'key': self.api_key,
-                'secret': self.api_secret,
-                'passphrase': self.api_passphrase
-            }
-        )
-        self.configs = self.client.configs()
-        self.client.get_user()
-        self.client.get_account()
-        self.apex_http = apex_http
+            self.mufex_http = MUFEX_HTTP_TEST
 
     def get_ticker(self, symbol: str):
         endpoint = "/api/v1/ticker"
         symbol_without_hyphen = symbol.replace("-", "")
         params = {'symbol': symbol_without_hyphen}
 
-        request_url = f"{self.apex_http}{endpoint}"
+        request_url = f"{self.mufex_http}{endpoint}"
+
+        signature, timestamp, recv_window = self.generate_signature(query_string=params)
+
+        headers = {
+            'MF-ACCESS-SIGN-TYPE': '2',
+            'MF-ACCESS-SIGN': signature,
+            'MF-ACCESS-API-KEY': self.api_key,
+            'MF-ACCESS-TIMESTAMP': str(timestamp),
+            'MF-ACCESS-RECV-WINDOW': str(recv_window),
+            'Content-Type': 'application/json'
+        }
 
         try:
             # Send the GET request with the constructed URL and params
-            response = requests.get(request_url, params=params)
+            response = requests.get(request_url, params=params, headers=headers)
             response.raise_for_status()  # This will raise an exception for HTTP error responses
             ret = response.json()
 
