@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import hashlib
 from flask import Flask, request, jsonify
 from dex.apex import ApexDex
 from dex.mufex import MufexDex
@@ -17,6 +18,7 @@ dex_instances = {
 DEX_ROUTER_API_KEY = get_decrypted_env('DEX_ROUTER_API_KEY')
 SUPPORTED_DEX_NAMES = ['apex', 'mufex']
 
+
 def get_dex(request):
     dex_name = request.args.get('dex')
     return dex_instances.get(dex_name)
@@ -27,7 +29,9 @@ def check_api_key():
     api_key = request.headers.get('Authorization')
     if api_key is None:
         return jsonify({"message": "API key missing"}), 401
-    elif api_key != f"{DEX_ROUTER_API_KEY}":
+
+    expected_hash = hashlib.sha256(DEX_ROUTER_API_KEY.encode()).hexdigest()
+    if api_key != expected_hash:
         return jsonify({"message": "Invalid API key"}), 401
 
 
@@ -45,7 +49,7 @@ def check_dex():
 @app.route('/ticker', methods=['GET'])
 def get_ticker():
     symbol = request.args.get('symbol')
-   
+
     if symbol is None:
         return jsonify({
             'message': 'Missing required parameter: symbol.'

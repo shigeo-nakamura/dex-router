@@ -14,6 +14,7 @@ from typing import Optional
 MUFEX_HTTP_MAIN = "https://api.mufex.finance"
 MUFEX_HTTP_TEST = "https://api.testnet.mufex.finance"
 
+
 class MufexDex(AbstractDex):
     def generate_signature(self, query_string='', json_body_string='', recv_window=5000):
         """
@@ -21,13 +22,14 @@ class MufexDex(AbstractDex):
         """
         timestamp = int(time.time() * 1000)
         prehash = f"{timestamp}{self.api_key}{recv_window}{query_string}{json_body_string}"
-        signature = hmac.new(self.api_secret.encode(), prehash.encode(), hashlib.sha256).hexdigest()
+        signature = hmac.new(self.api_secret.encode(),
+                             prehash.encode(), hashlib.sha256).hexdigest()
         return signature, timestamp, recv_window
 
     def __init__(self, env_mode="TESTNET"):
         env_vars = {
-            'MUFEX_API_KEY': get_decrypted_env(f'APEX_API_KEY'),
-            'MUFEX_API_SECRET': get_decrypted_env(f'APEX_API_SECRET'),
+            'MUFEX_API_KEY': get_decrypted_env(f'MUFEX_API_KEY'),
+            'MUFEX_API_SECRET': get_decrypted_env(f'MUFEX_API_SECRET'),
         }
 
         missing_vars = [key for key, value in env_vars.items()
@@ -51,7 +53,8 @@ class MufexDex(AbstractDex):
 
         request_url = f"{self.mufex_http}{endpoint}"
 
-        signature, timestamp, recv_window = self.generate_signature(query_string=params)
+        signature, timestamp, recv_window = self.generate_signature(
+            query_string=params)
 
         headers = {
             'MF-ACCESS-SIGN-TYPE': '2',
@@ -64,7 +67,8 @@ class MufexDex(AbstractDex):
 
         try:
             # Send the GET request with the constructed URL and params
-            response = requests.get(request_url, params=params, headers=headers)
+            response = requests.get(
+                request_url, params=params, headers=headers)
             response.raise_for_status()  # This will raise an exception for HTTP error responses
             ret = response.json()
 
