@@ -17,15 +17,13 @@ TICK_SIZE_MULTIPLIER = 5
 
 class ApexDex(AbstractDex):
     def __init__(self, env_mode="TESTNET"):
-        suffix = "_MAIN" if env_mode == "MAINNET" else "_TEST"
-
         env_vars = {
-            'APEX_API_KEY': get_decrypted_env(f'APEX_API_KEY{suffix}'),
-            'APEX_API_SECRET': get_decrypted_env(f'APEX_API_SECRET{suffix}'),
-            'APEX_API_PASSPHRASE': get_decrypted_env(f'APEX_API_PASSPHRASE{suffix}'),
-            'HEX_STARK_PUBLIC_KEY': get_decrypted_env(f'HEX_STARK_PUBLIC_KEY{suffix}'),
-            'HEX_STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env(f'HEX_STARK_PUBLIC_KEY_Y_COORDINATE{suffix}'),
-            'HEX_STARK_PRIVATE_KEY': get_decrypted_env(f'HEX_STARK_PRIVATE_KEY{suffix}'),
+            'APEX_API_KEY': get_decrypted_env(f'APEX_API_KEY'),
+            'APEX_API_SECRET': get_decrypted_env(f'APEX_API_SECRET'),
+            'APEX_API_PASSPHRASE': get_decrypted_env(f'APEX_API_PASSPHRASE'),
+            'HEX_APEX_STARK_PUBLIC_KEY': get_decrypted_env(f'HEX_APEX_STARK_PUBLIC_KEY'),
+            'HEX_APEX_STARK_PUBLIC_KEY_Y_COORDINATE': get_decrypted_env(f'HEX_APEX_STARK_PUBLIC_KEY_Y_COORDINATE'),
+            'HEX_APEX_STARK_PRIVATE_KEY': get_decrypted_env(f'HEX_APEX_STARK_PRIVATE_KEY'),
         }
 
         missing_vars = [key for key, value in env_vars.items()
@@ -37,9 +35,9 @@ class ApexDex(AbstractDex):
         self.api_key = env_vars['APEX_API_KEY']
         self.api_secret = env_vars['APEX_API_SECRET']
         self.api_passphrase = env_vars['APEX_API_PASSPHRASE']
-        self.stark_public_key = env_vars['HEX_STARK_PUBLIC_KEY']
-        self.stark_public_key_y_coordinate = env_vars['HEX_STARK_PUBLIC_KEY_Y_COORDINATE']
-        self.stark_private_key = env_vars['HEX_STARK_PRIVATE_KEY']
+        self.stark_public_key = env_vars['HEX_APEX_STARK_PUBLIC_KEY']
+        self.stark_public_key_y_coordinate = env_vars['HEX_APEX_STARK_PUBLIC_KEY_Y_COORDINATE']
+        self.stark_private_key = env_vars['HEX_APEX_STARK_PRIVATE_KEY']
 
         if env_mode == "MAINNET":
             apex_http = APEX_HTTP_MAIN
