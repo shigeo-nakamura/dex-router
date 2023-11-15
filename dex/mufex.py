@@ -62,21 +62,9 @@ class MufexDex(AbstractDex):
 
         request_url = f"{self.mufex_http}{endpoint}"
 
-        signature, timestamp, recv_window = self.generate_signature(
-            query_string=params)
-
-        headers = {
-            'MF-ACCESS-SIGN-TYPE': '2',
-            'MF-ACCESS-SIGN': signature,
-            'MF-ACCESS-API-KEY': self.api_key,
-            'MF-ACCESS-TIMESTAMP': str(timestamp),
-            'MF-ACCESS-RECV-WINDOW': str(recv_window),
-            'Content-Type': 'application/json'
-        }
-
         try:
             response = requests.get(
-                request_url, params=params, headers=headers)
+                request_url, params=params)
             response.raise_for_status()
             ret = response.json()
 
