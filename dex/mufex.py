@@ -2,9 +2,11 @@
 
 import hashlib
 import hmac
+import json
 import os
 
 from flask import make_response, jsonify
+import urllib.parse
 from .abstract_dex import AbstractDex
 import time
 from .kms_decrypt import get_decrypted_env
@@ -15,11 +17,11 @@ MUFEX_HTTP_MAIN = "https://api.mufex.finance"
 MUFEX_HTTP_TEST = "https://api.testnet.mufex.finance"
 
 
-def convert_side(side):
-    if side == 'BUY':
-        return 'Buy'
-    elif side == 'SELL':
-        return 'Sell'
+def convert_side(side, reverse=False):
+    side = side.upper()
+    side_map = {'BUY': 'Sell', 'SELL': 'Buy'}
+    if side in side_map:
+        return side_map[side] if reverse else side.capitalize()
     else:
         return 'Invalid Side'
 
@@ -36,9 +38,10 @@ class MufexDex(AbstractDex):
         return signature, timestamp, recv_window
 
     def __init__(self, env_mode="TESTNET"):
+        suffix = "_MAIN" if env_mode == "MAINNET" else "_TEST"
         env_vars = {
-            'MUFEX_API_KEY': get_decrypted_env(f'MUFEX_API_KEY'),
-            'MUFEX_API_SECRET': get_decrypted_env(f'MUFEX_API_SECRET'),
+            'MUFEX_API_KEY': get_decrypted_env(f'MUFEX_API_KEY{suffix}'),
+            'MUFEX_API_SECRET': get_decrypted_env(f'MUFEX_API_SECRET{suffix}'),
         }
 
         missing_vars = [key for key, value in env_vars.items()
@@ -88,9 +91,7 @@ class MufexDex(AbstractDex):
 
     def get_balance(self):
         endpoint = "/private/v1/account/balance"
-
         request_url = f"{self.mufex_http}{endpoint}"
-
         signature, timestamp, recv_window = self.generate_signature()
 
         headers = {
@@ -143,18 +144,19 @@ class MufexDex(AbstractDex):
                 'message': message
             }), 500)
 
-    def create_order_internal(self, symbol: str, size: str, side: str, price: Optional[str]):
+    def create_order_internal(self, symbol: str, size: str, side: str, price: Optional[str], reverse=False):
         endpoint = "/private/v1/trade/create"
         symbol_without_hyphen = symbol.replace("-", "")
 
-        side = convert_side(side)
-        params = {'symbol': symbol_without_hyphen, 'side': side, 'positionIdx': 0,
-                  'orderType': 'Market', 'qty': size, 'timeInForce': 'ImmediateOrCancel'}
+        side = convert_side(side, reverse)
+        json_body = {'symbol': symbol_without_hyphen, 'side': side, 'positionIdx': 0,
+                     'orderType': 'Market', 'qty': size, 'timeInForce': 'ImmediateOrCancel'}
+        json_body_string = json.dumps(json_body)
 
         request_url = f"{self.mufex_http}{endpoint}"
 
         signature, timestamp, recv_window = self.generate_signature(
-            query_string=params)
+            json_body_string=json_body_string)
 
         headers = {
             'MF-ACCESS-SIGN-TYPE': '2',
@@ -167,7 +169,7 @@ class MufexDex(AbstractDex):
 
         try:
             response = requests.post(
-                request_url, json=params, headers=headers)
+                request_url, json=json_body, headers=headers)
             response.raise_for_status()
             ret = response.json()
 
@@ -190,41 +192,47 @@ class MufexDex(AbstractDex):
         positions = self.get_positions(close_symbol)
 
         for position in positions:
+            size_float = float(position['size'])
+            if size_float == 0.0:
+                continue
             ret, message = self.create_order_internal(
-                position.symbol, position.size, position.side, None)
-        if ret is False:
-            return make_response(jsonify({
-                'message': message
-            }), 500)
+                position['symbol'], position['size'], position['side'], None, True)
+            if ret is False:
+                return make_response(jsonify({
+                    'message': message
+                }), 500)
 
         return jsonify({})
 
     def get_positions(self, symbol):
         endpoint = "/private/v1/account/positions"
         params = {}
+
         if symbol is not None:
-            params['symbol'] = symbol
+            symbol_without_hyphen = symbol.replace("-", "")
+            params['symbol'] = symbol_without_hyphen
 
         request_url = f"{self.mufex_http}{endpoint}"
 
         signature, timestamp, recv_window = self.generate_signature(
-            query_string=params)
+            urllib.parse.urlencode(params))
 
         headers = {
             'MF-ACCESS-SIGN-TYPE': '2',
             'MF-ACCESS-SIGN': signature,
             'MF-ACCESS-API-KEY': self.api_key,
             'MF-ACCESS-TIMESTAMP': str(timestamp),
-            'MF-ACCESS-RECV-WINDOW': str(recv_window),
-            'Content-Type': 'application/json'
+            'MF-ACCESS-RECV-WINDOW': str(recv_window)
         }
 
         try:
-            response = requests.get(request_url)
-            response.raise_for_status()
-            data = response.json()
+            response = requests.get(
+                request_url, params=params, headers=headers)
 
-            positions = data["data"]["list"]
+            response.raise_for_status()
+            ret = response.json()
+
+            positions = ret['data']["list"]
             extracted_positions = []
 
             for position in positions:

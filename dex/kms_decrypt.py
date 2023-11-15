@@ -66,15 +66,3 @@ def get_decrypted_env(name):
         return decrypt_data_with_kms(encrypted_key, encrypted_data, is_hex)
     else:
         return None
-
-
-if __name__ == '__main__':
-    encrypted_key = os.environ.get("ENCRYPTED_DATA_KEY")
-
-    encrypted_data_val = os.environ.get("ENCRYPTED_APEX_API_KEY")
-    decrypted = decrypt_data_with_kms(
-        encrypted_key, encrypted_data_val, is_hex=False)
-
-    encrypted_data_val = os.environ.get("ENCRYPTED_HEX_APEX_STARK_PRIVATE_KEY")
-    decrypted = decrypt_data_with_kms(
-        encrypted_key, encrypted_data_val, is_hex=True)
