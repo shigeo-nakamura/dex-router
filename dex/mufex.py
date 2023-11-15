@@ -15,6 +15,15 @@ MUFEX_HTTP_MAIN = "https://api.mufex.finance"
 MUFEX_HTTP_TEST = "https://api.testnet.mufex.finance"
 
 
+def convert_side(side):
+    if side == 'BUY':
+        return 'Buy'
+    elif side == 'SELL':
+        return 'Sell'
+    else:
+        return 'Invalid Side'
+
+
 class MufexDex(AbstractDex):
     def generate_signature(self, query_string='', json_body_string='', recv_window=5000):
         """
@@ -47,7 +56,7 @@ class MufexDex(AbstractDex):
             self.mufex_http = MUFEX_HTTP_TEST
 
     def get_ticker(self, symbol: str):
-        endpoint = "/api/v1/ticker"
+        endpoint = "/public/v1/market/tickers"
         symbol_without_hyphen = symbol.replace("-", "")
         params = {'symbol': symbol_without_hyphen}
 
@@ -66,157 +75,166 @@ class MufexDex(AbstractDex):
         }
 
         try:
-            # Send the GET request with the constructed URL and params
             response = requests.get(
                 request_url, params=params, headers=headers)
-            response.raise_for_status()  # This will raise an exception for HTTP error responses
+            response.raise_for_status()
             ret = response.json()
 
-            if 'data' in ret and ret['data']:
-                data_first_item = ret['data'][0]
+            price = last_price = ret["data"]["list"][0]["lastPrice"]
 
-                if 'lastPrice' in data_first_item:
-                    return jsonify({
-                        'symbol': symbol,
-                        'price': data_first_item['lastPrice']
-                    })
-                else:
-                    error_message = 'lastPrice information is missing in the response'
-                    print(error_message, ret)
-                    return make_response(jsonify({
-                        'message': error_message
-                    }), 500)
+            return jsonify({
+                'symbol': symbol,
+                'price': price
+            })
 
-            else:
-                error_message = 'Data is missing in the response'
-                print(error_message, ret)
-                return make_response(jsonify({
-                    'message': error_message
-                }), 500)
-
-        except requests.exceptions.JSONDecodeError as e:
-            print(f"JSONDecodeError: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
             response_content = e.response.text if e.response else 'No content'
             status_code = e.response.status_code if e.response else 'No status code'
             print(f"HTTP Response Content: {response_content}")
             print(f"HTTP Status Code: {status_code}")
-            return make_response(jsonify({
-                'message': f"Could not decode JSON, HTTP Status Code: {status_code}, Content: {response_content}"
-            }), 500)
 
-        except Exception as e:
-            print(f"Unexpected error: {e}")
             return make_response(jsonify({
                 'message': str(e)
             }), 500)
 
     def get_balance(self):
-        ret = self.client.get_account_balance()
+        endpoint = "/private/v1/account/balance"
 
-        if 'data' in ret:
-            required_keys = ['totalEquityValue', 'availableBalance']
-            data = ret['data']
+        request_url = f"{self.mufex_http}{endpoint}"
 
-            if all(key in data for key in required_keys):
-                return jsonify({
-                    'equity': data['totalEquityValue'],
-                    'balance': data['availableBalance'],
-                })
+        signature, timestamp, recv_window = self.generate_signature()
 
-        return make_response(jsonify({
-            'message': 'Some required data is missing in the response'
-        }), 500)
+        headers = {
+            'MF-ACCESS-SIGN-TYPE': '2',
+            'MF-ACCESS-SIGN': signature,
+            'MF-ACCESS-API-KEY': self.api_key,
+            'MF-ACCESS-TIMESTAMP': str(timestamp),
+            'MF-ACCESS-RECV-WINDOW': str(recv_window),
+            'Content-Type': 'application/json'
+        }
 
-    def modify_price_for_instant_fill(self, symbol: str, side: str, price: str):
-        symbolData = {}
-        for k, v in enumerate(self.configs.get('data').get('perpetualContract')):
-            if v.get('symbol') == symbol:
-                symbolData = v
-                break
+        try:
+            response = requests.get(
+                request_url, headers=headers)
+            response.raise_for_status()
+            ret = response.json()
 
-        price_float = float(price)
-        tick_size_float = float(symbolData.get('tickSize'))
-        if side == 'BUY':
-            price_float += tick_size_float * TICK_SIZE_MULTIPLIER
-        else:
-            price_float -= tick_size_float * TICK_SIZE_MULTIPLIER
-        return str(price_float)
+            equity = ret["data"]["list"][0]["equity"]
+            balance = ret["data"]["list"][0]["walletBalance"]
+
+            return jsonify({
+                'equity': equity,
+                'balance': balance
+            })
+
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            response_content = e.response.text if e.response else 'No content'
+            status_code = e.response.status_code if e.response else 'No status code'
+            print(f"HTTP Response Content: {response_content}")
+            print(f"HTTP Status Code: {status_code}")
+
+            return make_response(jsonify({
+                'message': str(e)
+            }), 500)
 
     def create_order(self, symbol: str, size: str, side: str, price: Optional[str]):
+        ret = self.create_order_internal(symbol, size, side, price)
+        if ret is True:
+            return jsonify({})
+        else:
+            return make_response(jsonify({
+            }), 500)
+
+    def create_order_internal(self, symbol: str, size: str, side: str, price: Optional[str]):
+        endpoint = "/private/v1/trade/create"
+        symbol_without_hyphen = symbol.replace("-", "")
+
+        side = convert_side(side)
+        params = {'symbol': symbol_without_hyphen, 'side': side, 'positionIdx': 0,
+                  'orderType': 'Market', 'qty': size, 'timeInForce': 'ImmediateOrCancel'}
+
+        request_url = f"{self.mufex_http}{endpoint}"
+
+        signature, timestamp, recv_window = self.generate_signature(
+            query_string=params)
+
+        headers = {
+            'MF-ACCESS-SIGN-TYPE': '2',
+            'MF-ACCESS-SIGN': signature,
+            'MF-ACCESS-API-KEY': self.api_key,
+            'MF-ACCESS-TIMESTAMP': str(timestamp),
+            'MF-ACCESS-RECV-WINDOW': str(recv_window),
+            'Content-Type': 'application/json'
+        }
+
         try:
-            if price is None:
-                worstPrice = self.client.get_worst_price(
-                    symbol=symbol, side=side, size=size)
-                price = worstPrice['data']['worstPrice']
-            currentTime = time.time()
-            limitFeeRate = self.client.account['takerFeeRate']
+            response = requests.post(
+                request_url, json=params, headers=headers)
+            response.raise_for_status()
+            ret = response.json()
 
-            symbolData = {}
-            for k, v in enumerate(self.configs.get('data').get('perpetualContract')):
-                if v.get('symbol') == symbol:
-                    symbolData = v
-                    break
-
-            rounded_size = round_size(size, symbolData.get('stepSize'))
-            rounded_price = round_size(price, symbolData.get('tickSize'))
-
-            adjusted_price = self.modify_price_for_instant_fill(
-                symbol, side, rounded_price)
-
-            ret = self.client.create_order(symbol=symbol, side=side,
-                                           type="MARKET", size=rounded_size, price=adjusted_price, limitFeeRate=limitFeeRate,
-                                           expirationEpochSeconds=currentTime)
-
-            if 'code' in ret:
-                return make_response(jsonify({
-                    'message': ret.get('msg', '')
-                }), 500)
-
-            return jsonify({
-                'price': ret['data']['price'],
-                'size': ret['data']['size'],
-            })
+            return ret['code'] == 0
 
         except Exception as e:
-            print(f"An error occurred in create_order: {e}")
-            return make_response(jsonify({
-                'message': str(e)
-            }), 500)
+            print(f"Unexpected error: {e}")
+            response_content = e.response.text if e.response else 'No content'
+            status_code = e.response.status_code if e.response else 'No status code'
+            print(f"HTTP Response Content: {response_content}")
+            print(f"HTTP Status Code: {status_code}")
+            return False
 
     def close_all_positions(self, close_symbol):
-        account_data = self.client.get_account()
-        position_sizes = {}
+        positions = self.get_positions(close_symbol)
 
-        for position in account_data['data']['openPositions']:
-            symbol = position['symbol']
-            side = position['side']
-            size_str = position['size']
-            size_float = float(position['size'])
+        for position in positions:
+            ret = self.create_order_internal(
+                position.symbol, position.size, position.side, None)
+        if ret is False:
+            return make_response(jsonify({
+            }), 500)
 
-            if size_float != 0:
-                key = f"{symbol}_{side}"
-                position_sizes[key] = size_str
+        return jsonify({})
+
+    def get_positions(self, symbol):
+        endpoint = "/private/v1/account/positions"
+        params = {}
+        if symbol is not None:
+            params['symbol'] = symbol
+
+        request_url = f"{self.mufex_http}{endpoint}"
+
+        signature, timestamp, recv_window = self.generate_signature(
+            query_string=params)
+
+        headers = {
+            'MF-ACCESS-SIGN-TYPE': '2',
+            'MF-ACCESS-SIGN': signature,
+            'MF-ACCESS-API-KEY': self.api_key,
+            'MF-ACCESS-TIMESTAMP': str(timestamp),
+            'MF-ACCESS-RECV-WINDOW': str(recv_window),
+            'Content-Type': 'application/json'
+        }
 
         try:
-            for key, size in position_sizes.items():
-                symbol, side = key.split('_')
-                if close_symbol == "" or symbol == close_symbol:
-                    opposite_order_side = 'SELL' if side == 'LONG' else 'BUY'
+            response = requests.get(request_url)
+            response.raise_for_status()
+            data = response.json()
 
-                ticker_response = self.get_ticker(symbol)
-                if ticker_response.status_code == 200:
-                    price_data = ticker_response.get_json()
-                    price = price_data.get('price', None)
-                else:
-                    price = None
+            positions = data["data"]["list"]
+            extracted_positions = []
 
-                self.create_order(symbol, size, opposite_order_side, price)
+            for position in positions:
+                extracted_position = {
+                    "symbol": position["symbol"],
+                    "size": position["size"],
+                    "side": position["side"]
+                }
+                extracted_positions.append(extracted_position)
 
-            return jsonify({
-            })
+            return extracted_positions
 
-        except Exception as e:
-            print(f"An error occurred in close_all_positions: {e}")
-            return make_response(jsonify({
-                'message': str(e)
-            }), 500)
+        except requests.exceptions.RequestException as e:
+            print(f"Request error: {e}")
+            return []

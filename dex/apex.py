@@ -204,7 +204,7 @@ class ApexDex(AbstractDex):
         try:
             for key, size in position_sizes.items():
                 symbol, side = key.split('_')
-                if close_symbol == "" or symbol == close_symbol:
+                if close_symbol is None or symbol == close_symbol:
                     opposite_order_side = 'SELL' if side == 'LONG' else 'BUY'
 
                 ticker_response = self.get_ticker(symbol)
