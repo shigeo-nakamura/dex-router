@@ -108,6 +108,13 @@ class MufexDex(AbstractDex):
             response.raise_for_status()
             ret = response.json()
 
+            code = ret['code']
+            if code != 0:
+                message = ret['message'] + f"({code})"
+                return make_response(jsonify({
+                    'message': message
+                }), 500)
+
             equity = ret["data"]["list"][0]["equity"]
             balance = ret["data"]["list"][0]["walletBalance"]
 
@@ -128,11 +135,12 @@ class MufexDex(AbstractDex):
             }), 500)
 
     def create_order(self, symbol: str, size: str, side: str, price: Optional[str]):
-        ret = self.create_order_internal(symbol, size, side, price)
+        ret, message = self.create_order_internal(symbol, size, side, price)
         if ret is True:
             return jsonify({})
         else:
             return make_response(jsonify({
+                'message': message
             }), 500)
 
     def create_order_internal(self, symbol: str, size: str, side: str, price: Optional[str]):
@@ -163,7 +171,12 @@ class MufexDex(AbstractDex):
             response.raise_for_status()
             ret = response.json()
 
-            return ret['code'] == 0
+            message = ret['message']
+            code = ret['code']
+            if code != 0:
+                message = message + f"error code {code}"
+
+            return code == 0, message
 
         except Exception as e:
             print(f"Unexpected error: {e}")
@@ -171,16 +184,17 @@ class MufexDex(AbstractDex):
             status_code = e.response.status_code if e.response else 'No status code'
             print(f"HTTP Response Content: {response_content}")
             print(f"HTTP Status Code: {status_code}")
-            return False
+            return False, None
 
     def close_all_positions(self, close_symbol):
         positions = self.get_positions(close_symbol)
 
         for position in positions:
-            ret = self.create_order_internal(
+            ret, message = self.create_order_internal(
                 position.symbol, position.size, position.side, None)
         if ret is False:
             return make_response(jsonify({
+                'message': message
             }), 500)
 
         return jsonify({})
