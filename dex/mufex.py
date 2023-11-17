@@ -116,7 +116,7 @@ class MufexDex(AbstractDex):
 
         json_body = {
             'symbol': symbol_without_hyphen, 'side': side, 'positionIdx': 0,
-            'orderType': 'Market', 'qty': rounded_size, 'timeInForce': 'ImmediateOrCancel'
+            'orderType': 'Market', 'qty': str(rounded_size), 'timeInForce': 'ImmediateOrCancel'
         }
         json_body_string = json.dumps(json_body)
 
