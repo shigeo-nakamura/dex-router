@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import decimal
 import hashlib
 import hmac
 import json
@@ -15,6 +16,11 @@ from typing import Optional
 
 MUFEX_HTTP_MAIN = "https://api.mufex.finance"
 MUFEX_HTTP_TEST = "https://api.testnet.mufex.finance"
+
+
+def round_size(size, ticker_size):
+    sizeNumber = decimal.Decimal(size) / decimal.Decimal(ticker_size)
+    return decimal.Decimal(int(sizeNumber)) * decimal.Decimal(ticker_size)
 
 
 def convert_side(side, reverse=False):
@@ -145,12 +151,37 @@ class MufexDex(AbstractDex):
             }), 500)
 
     def create_order_internal(self, symbol: str, size: str, side: str, price: Optional[str], reverse=False):
-        endpoint = "/private/v1/trade/create"
         symbol_without_hyphen = symbol.replace("-", "")
+
+        endpoint = "/public/v1/instruments"
+        params = {'symbol': symbol_without_hyphen}
+        request_url = f"{self.mufex_http}{endpoint}"
+
+        try:
+            response = requests.get(
+                request_url, params=params)
+            response.raise_for_status()
+            ret = response.json()
+
+            qty_step = ret["data"]["list"][0]["lotSizeFilter"]["qtyStep"]
+
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            response_content = e.response.text if e.response else 'No content'
+            status_code = e.response.status_code if e.response else 'No status code'
+            print(f"HTTP Response Content: {response_content}")
+            print(f"HTTP Status Code: {status_code}")
+
+            return make_response(jsonify({
+                'message': str(e)
+            }), 500)
+
+        endpoint = "/private/v1/trade/create"
+        rounded_size = round_size(size, qty_step)
 
         side = convert_side(side, reverse)
         json_body = {'symbol': symbol_without_hyphen, 'side': side, 'positionIdx': 0,
-                     'orderType': 'Market', 'qty': size, 'timeInForce': 'ImmediateOrCancel'}
+                     'orderType': 'Market', 'qty': rounded_size, 'timeInForce': 'ImmediateOrCancel'}
         json_body_string = json.dumps(json_body)
 
         request_url = f"{self.mufex_http}{endpoint}"
