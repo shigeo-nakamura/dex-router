@@ -176,7 +176,7 @@ class MufexDex(AbstractDex):
             message = ret['message']
             code = ret['code']
             if code != 0:
-                message = message + f"error code {code}"
+                message = message + f"({code})"
 
             return code == 0, message
 
