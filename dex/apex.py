@@ -173,14 +173,31 @@ class ApexDex(AbstractDex):
                                            expirationEpochSeconds=currentTime)
 
             if 'code' in ret:
+                code = ret['code']
+                message = ret.get('msg', '') + f" ({code})"
                 return make_response(jsonify({
-                    'message': ret.get('msg', '')
+                    'message': message
                 }), 500)
 
-            return jsonify({
-                'price': ret['data']['price'],
-                'size': ret['data']['size'],
-            })
+            id = ret['data']['orderId']
+            ret = self.client.get_order(id=id)
+
+            if 'code' in ret:
+                code = ret['code']
+                message = ret.get('msg', '') + f" ({code})"
+                return make_response(jsonify({
+                    'message': message
+                }), 500)
+
+            if ret['data']['status'] == 'FILLED':
+                return jsonify({
+                    'price': ret['data']['cumSuccessFillValue'],
+                    'size': ret['data']['size'],
+                    'fee': ret['data']['cumSuccessFillFee'],
+                })
+            else:
+                return jsonify({
+                })
 
         except Exception as e:
             print(f"An error occurred in create_order: {e}")

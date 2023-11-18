@@ -139,7 +139,32 @@ class MufexDex(AbstractDex):
             return response
 
         data = response.data
-        code = data.get('code', 0)
+        code = data.get('code', 9999)
+        if code != 0:
+            message = data.get('message', '') + f" ({code})"
+            return ApiResponse(error=message)
+
+        id = data['data']['orderId']
+        endpoint = "/private/v1/trade/activity-orders"
+        params = {'orderId': id, 'symbol': symbol_without_hyphen}
+        signature, timestamp, recv_window = self.__generate_signature(
+            urllib.parse.urlencode(params))
+
+        headers = {
+            'MF-ACCESS-SIGN-TYPE': '2',
+            'MF-ACCESS-SIGN': signature,
+            'MF-ACCESS-API-KEY': self.api_key,
+            'MF-ACCESS-TIMESTAMP': str(timestamp),
+            'MF-ACCESS-RECV-WINDOW': str(recv_window)
+        }
+
+        response = self.__send_get_request(
+            endpoint, params=params, headers=headers)
+        if response.is_error():
+            return response
+
+        data = response.data
+        code = data.get('code', 9999)
         if code != 0:
             message = data.get('message', '') + f" ({code})"
             return ApiResponse(error=message)
@@ -172,7 +197,7 @@ class MufexDex(AbstractDex):
 
         data = response.data
 
-        code = data.get('code', 0)
+        code = data.get('code', 9999)
         if code != 0:
             message = data.get('message', '') + f"({code})"
             return ApiResponse(error=message)
@@ -229,7 +254,7 @@ class MufexDex(AbstractDex):
 
         data = response.data
 
-        code = data.get('code', 0)
+        code = data.get('code', 9999)
         if code != 0:
             message = data.get('message', '') + f" ({code})"
             return make_response(jsonify({'message': message}), 500)
@@ -249,7 +274,22 @@ class MufexDex(AbstractDex):
                 'message': response.error
             }), 500)
         else:
-            return jsonify({})
+            data = response.data
+
+            if data["data"]["list"][0]["orderStatus"] == 'Filled':
+                size = data["data"]["list"][0]["cumExecQty"]
+                val = data["data"]["list"][0]["cumExecValue"]
+                fee = data["data"]["list"][0]["cumExecFee"]
+                price_float = float(val) / float(size)
+                price = str(price_float)
+
+                return jsonify({
+                    'price': price,
+                    'size': size,
+                    'fee': fee,
+                })
+            else:
+                return jsonify({})
 
     def close_all_positions(self, close_symbol):
         response = self.__get_positions(close_symbol)
