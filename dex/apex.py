@@ -12,7 +12,7 @@ from .kms_decrypt import get_decrypted_env
 import requests
 from typing import Optional
 
-TICK_SIZE_MULTIPLIER = 5
+TICK_SIZE_MULTIPLIER = 10
 
 
 class ApexDex(AbstractDex):
@@ -190,10 +190,15 @@ class ApexDex(AbstractDex):
                 }), 500)
 
             if ret['data']['status'] == 'FILLED':
+                size = ret['data']['size']
+                val = ret['data']['cumSuccessFillValue']
+                fee = ret['data']['cumSuccessFillFee']
+                price_float = float(val) / float(size)
+                price = str(price_float)
                 return jsonify({
-                    'price': ret['data']['cumSuccessFillValue'],
-                    'size': ret['data']['size'],
-                    'fee': ret['data']['cumSuccessFillFee'],
+                    'price': price,
+                    'size': size,
+                    'fee': fee,
                 })
             else:
                 return jsonify({
