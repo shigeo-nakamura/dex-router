@@ -10,13 +10,19 @@ from dex.kms_decrypt import get_decrypted_env
 app = Flask(__name__)
 
 env_mode = os.environ.get("ENV_MODE", "TESTNET").upper()
-dex_instances = {
-    'apex': ApexDex(env_mode),
-    'mufex': MufexDex(env_mode)
+
+supported_dex_names = os.environ.get(
+    "SUPPORTED_DEX", "apex,mufex").lower().split(',')
+
+dex_classes = {
+    'apex': ApexDex,
+    'mufex': MufexDex
 }
 
+dex_instances = {dex_name: dex_classes[dex_name](
+    env_mode) for dex_name in supported_dex_names if dex_name in dex_classes}
+
 DEX_ROUTER_API_KEY = get_decrypted_env('DEX_ROUTER_API_KEY')
-SUPPORTED_DEX_NAMES = ['apex', 'mufex']
 
 
 def get_dex(request):
@@ -41,7 +47,7 @@ def check_dex():
     dex_name = request.args.get('dex')
     if not dex_name:
         return jsonify({"message": "DEX missing"}), 400
-    elif dex_name not in SUPPORTED_DEX_NAMES:  # Assuming you have a list of supported DEX names
+    elif dex_name not in supported_dex_names:
         return jsonify({"message": "Unsupported DEX"}), 400
 
 
