@@ -67,9 +67,11 @@ class MufexDex(AbstractDex):
         request_url = f"{self.mufex_http}{endpoint}"
         try:
             response = requests.get(
-                request_url, params=params, headers=headers)
+                request_url, params=params, headers=headers, timeout=1)
             response.raise_for_status()
             return ApiResponse(data=response.json())
+        except requests.exceptions.Timeout:
+            return ApiResponse(error=f"Request timed out: url={request_url}")
         except Exception as e:
             self.__handle_request_error(e)
             return ApiResponse(error=str(e))
@@ -78,9 +80,11 @@ class MufexDex(AbstractDex):
         request_url = f"{self.mufex_http}{endpoint}"
         try:
             response = requests.post(
-                request_url, json=json_body, headers=headers)
+                request_url, json=json_body, headers=headers, timeout=1)
             response.raise_for_status()
             return ApiResponse(data=response.json())
+        except requests.exceptions.Timeout:
+            return ApiResponse(error=f"Request timed out: url={request_url}")
         except Exception as e:
             self.__handle_request_error(e)
             return ApiResponse(error=str(e))
