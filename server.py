@@ -6,8 +6,12 @@ from flask import Flask, request, jsonify
 from dex.apex import ApexDex
 from dex.mufex import MufexDex
 from dex.kms_decrypt import get_decrypted_env
+import logging
 
 app = Flask(__name__)
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.WARNING)
 
 env_mode = os.environ.get("ENV_MODE", "TESTNET").upper()
 
