@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 import os
+import threading
 
 from flask import make_response, jsonify
 from .abstract_dex import AbstractDex
 from apexpro.http_private_stark_key_sign import HttpPrivateStark
 from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST, APEX_HTTP_MAIN, NETWORKID_MAIN
+from apexpro.constants import APEX_WS_MAIN, APEX_WS_TEST
+from apexpro.websocket_api import WebSocket
 from apexpro.helpers.util import round_size
 import time
 from .kms_decrypt import get_decrypted_env
@@ -13,6 +16,34 @@ import requests
 from typing import Optional
 
 TICK_SIZE_MULTIPLIER = 10
+
+SUPPORTED_TICKERS = ['BTCUSDC', 'ETHUSDC', 'SOLUSDC', 'AVAXUSDC',
+                     'ARBUSDC', 'XRPUSDC', 'MATICUSDC', 'OPUSDC', 'SOLUSDC', 'BNBUSDC']
+
+latest_price_info = {}
+processed_orders = set()
+websocket_lock = threading.Lock()
+
+
+def on_ticker_changed(message):
+    symbol = message.get('data', {}).get('symbol')
+    last_price = message.get('data', {}).get('lastPrice')
+
+    if symbol != None and last_price != None:
+        global latest_price_info
+        with websocket_lock:
+            latest_price_info[symbol] = last_price
+
+
+def on_account_changed(message):
+    current_orders = message['contents']['orders']
+    for order in current_orders:
+        order_id = order['orderId']
+        current_status = order['status']
+
+        with websocket_lock:
+            if order_id not in processed_orders:
+                processed_orders.add(order_id)
 
 
 class ApexDex(AbstractDex):
@@ -33,87 +64,69 @@ class ApexDex(AbstractDex):
             raise EnvironmentError(
                 f"Required environment variables are not set: {', '.join(missing_vars)}")
 
-        self.api_key = env_vars['APEX_API_KEY']
-        self.api_secret = env_vars['APEX_API_SECRET']
-        self.api_passphrase = env_vars['APEX_API_PASSPHRASE']
-        self.stark_public_key = env_vars['HEX_APEX_STARK_PUBLIC_KEY']
-        self.stark_public_key_y_coordinate = env_vars['HEX_APEX_STARK_PUBLIC_KEY_Y_COORDINATE']
-        self.stark_private_key = env_vars['HEX_APEX_STARK_PRIVATE_KEY']
+        api_key = env_vars['APEX_API_KEY']
+        api_secret = env_vars['APEX_API_SECRET']
+        api_passphrase = env_vars['APEX_API_PASSPHRASE']
+        stark_public_key = env_vars['HEX_APEX_STARK_PUBLIC_KEY']
+        stark_public_key_y_coordinate = env_vars['HEX_APEX_STARK_PUBLIC_KEY_Y_COORDINATE']
+        stark_private_key = env_vars['HEX_APEX_STARK_PRIVATE_KEY']
+
+        api_key_credentials = {
+            'key': api_key,
+            'secret': api_secret,
+            'passphrase': api_passphrase
+        }
 
         if env_mode == "MAINNET":
             apex_http = APEX_HTTP_MAIN
             network_id = NETWORKID_MAIN
+            endpoint = APEX_WS_MAIN
         else:
             apex_http = APEX_HTTP_TEST
             network_id = NETWORKID_TEST
+            endpoint = APEX_WS_TEST
 
         self.client = HttpPrivateStark(
             apex_http,
             network_id=network_id,
-            stark_public_key=self.stark_public_key,
-            stark_private_key=self.stark_private_key,
-            stark_public_key_y_coordinate=self.stark_public_key_y_coordinate,
-            api_key_credentials={
-                'key': self.api_key,
-                'secret': self.api_secret,
-                'passphrase': self.api_passphrase
-            }
+            stark_public_key=stark_public_key,
+            stark_private_key=stark_private_key,
+            stark_public_key_y_coordinate=stark_public_key_y_coordinate,
+            api_key_credentials=api_key_credentials,
         )
         self.configs = self.client.configs()
         self.client.get_user()
         self.client.get_account()
         self.apex_http = apex_http
 
+        # Create WebSocket with authentication
+        ws_client = WebSocket(
+            endpoint=endpoint,
+            api_key_credentials=api_key_credentials,
+        )
+
+        # subscriptions
+        ws_client.account_info_stream(on_account_changed)
+        for ticker in SUPPORTED_TICKERS:
+            ws_client.ticker_stream(on_ticker_changed, ticker)
+
     def get_ticker(self, symbol: str):
         endpoint = "/api/v1/ticker"
         symbol_without_hyphen = symbol.replace("-", "")
-        params = {'symbol': symbol_without_hyphen}
 
-        request_url = f"{self.apex_http}{endpoint}"
+        with websocket_lock:
+            data = latest_price_info.copy()
 
-        try:
-            # Send the GET request with the constructed URL and params
-            response = requests.get(request_url, params=params)
-            response.raise_for_status()  # This will raise an exception for HTTP error responses
-            ret = response.json()
-
-            if 'data' in ret and ret['data']:
-                data_first_item = ret['data'][0]
-
-                if 'lastPrice' in data_first_item:
-                    return jsonify({
-                        'symbol': symbol,
-                        'price': data_first_item['lastPrice']
-                    })
-                else:
-                    error_message = 'lastPrice information is missing in the response'
-                    print(error_message, ret)
-                    return make_response(jsonify({
-                        'message': error_message
-                    }), 500)
-
-            else:
-                error_message = 'Data is missing in the response'
-                print(error_message, ret)
-                return make_response(jsonify({
-                    'message': error_message
-                }), 500)
-
-        except requests.exceptions.JSONDecodeError as e:
-            print(f"JSONDecodeError: {e}")
-            response_content = e.response.text if e.response else 'No content'
-            status_code = e.response.status_code if e.response else 'No status code'
-            print(f"HTTP Response Content: {response_content}")
-            print(f"HTTP Status Code: {status_code}")
+        if symbol_without_hyphen in data:
+            return jsonify({
+                'symbol': symbol,
+                'price': data[symbol_without_hyphen]
+            })
+        else:
+            error_message = 'lastPrice information is unknown'
             return make_response(jsonify({
-                'message': f"Could not decode JSON, HTTP Status Code: {status_code}, Content: {response_content}"
-            }), 500)
-
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            return make_response(jsonify({
-                'message': str(e)
-            }), 500)
+                'message': error_message
+            }), 503)
 
     def get_balance(self):
         ret = self.client.get_account_balance()
