@@ -28,11 +28,9 @@ dex_instances = {dex_name: dex_classes[dex_name](
 
 DEX_ROUTER_API_KEY = get_decrypted_env('DEX_ROUTER_API_KEY')
 
-
 def get_dex(request):
     dex_name = request.args.get('dex')
     return dex_instances.get(dex_name)
-
 
 @app.before_request
 def check_api_key():
@@ -44,7 +42,6 @@ def check_api_key():
     if api_key != expected_hash:
         return jsonify({"message": "Invalid API key"}), 401
 
-
 @app.before_request
 def check_dex():
     # Get the DEX name from the request arguments
@@ -53,7 +50,6 @@ def check_dex():
         return jsonify({"message": "DEX missing"}), 400
     elif dex_name not in supported_dex_names:
         return jsonify({"message": "Unsupported DEX"}), 400
-
 
 # GET /ticker
 @app.route('/ticker', methods=['GET'])
@@ -68,13 +64,24 @@ def get_ticker():
     dex = get_dex(request)
     return dex.get_ticker(symbol)
 
+# GET /get-filled-orders
+@app.route('/get-filled-orders', methods=['GET'])
+def get_filled_orders():
+    symbol = request.args.get('symbol')
+
+    if symbol is None:
+        return jsonify({
+            'message': 'Missing required parameter: symbol.'
+        }), 400
+
+    dex = get_dex(request)
+    return dex.get_filled_orders(symbol)
 
 # GET /get-balance
 @app.route('/get-balance', methods=['GET'])
 def get_balance():
     dex = get_dex(request)
     return dex.get_balance()
-
 
 # POST /create-order
 @app.route('/create-order', methods=['POST'])
@@ -93,7 +100,6 @@ def create_order():
 
     dex = get_dex(request)
     return dex.create_order(symbol, size, side, price)
-
 
 # POST /close_all_positions
 @app.route('/close_all_positions', methods=['POST'])

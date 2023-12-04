@@ -43,6 +43,8 @@ class ApiResponse:
 
 class MufexDex(AbstractDex):
     def __init__(self, env_mode="TESTNET"):
+        super().__init__()
+
         suffix = "_MAIN" if env_mode == "MAINNET" else "_TEST"
         env_vars = {
             'MUFEX_API_KEY': get_decrypted_env(f'MUFEX_API_KEY{suffix}'),
@@ -238,6 +240,9 @@ class MufexDex(AbstractDex):
             'symbol': symbol,
             'price': price
         })
+
+    def get_filled_orders(self, symbol: str):
+        raise Exception("Not implemented")
 
     def get_balance(self):
         endpoint = "/private/v1/account/balance"

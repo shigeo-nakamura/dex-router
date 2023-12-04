@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
 
 import os
+import threading
 
 from flask import make_response, jsonify
 from .abstract_dex import AbstractDex
 from apexpro.http_private_stark_key_sign import HttpPrivateStark
 from apexpro.constants import APEX_HTTP_TEST, NETWORKID_TEST, APEX_HTTP_MAIN, NETWORKID_MAIN
+from apexpro.constants import APEX_WS_MAIN, APEX_WS_TEST
+from apexpro.websocket_api import WebSocket
 from apexpro.helpers.util import round_size
 import time
 from .kms_decrypt import get_decrypted_env
 import requests
 from typing import Optional
+import threading
 
-TICK_SIZE_MULTIPLIER = 10
+SUPPORTED_TICKERS = ['BTCUSDC', 'ETHUSDC', 'SOLUSDC', 'AVAXUSDC',
+                     'ARBUSDC', 'XRPUSDC', 'MATICUSDC', 'OPUSDC', 'SOLUSDC', 'BNBUSDC']
 
 
 class ApexDex(AbstractDex):
     def __init__(self, env_mode="TESTNET"):
+        super().__init__()
+
         suffix = "_MAIN" if env_mode == "MAINNET" else "_TEST"
         env_vars = {
             'APEX_API_KEY': get_decrypted_env(f'APEX_API_KEY{suffix}'),
@@ -33,87 +40,114 @@ class ApexDex(AbstractDex):
             raise EnvironmentError(
                 f"Required environment variables are not set: {', '.join(missing_vars)}")
 
-        self.api_key = env_vars['APEX_API_KEY']
-        self.api_secret = env_vars['APEX_API_SECRET']
-        self.api_passphrase = env_vars['APEX_API_PASSPHRASE']
-        self.stark_public_key = env_vars['HEX_APEX_STARK_PUBLIC_KEY']
-        self.stark_public_key_y_coordinate = env_vars['HEX_APEX_STARK_PUBLIC_KEY_Y_COORDINATE']
-        self.stark_private_key = env_vars['HEX_APEX_STARK_PRIVATE_KEY']
+        api_key = env_vars['APEX_API_KEY']
+        api_secret = env_vars['APEX_API_SECRET']
+        api_passphrase = env_vars['APEX_API_PASSPHRASE']
+        stark_public_key = env_vars['HEX_APEX_STARK_PUBLIC_KEY']
+        stark_public_key_y_coordinate = env_vars['HEX_APEX_STARK_PUBLIC_KEY_Y_COORDINATE']
+        stark_private_key = env_vars['HEX_APEX_STARK_PRIVATE_KEY']
+
+        api_key_credentials = {
+            'key': api_key,
+            'secret': api_secret,
+            'passphrase': api_passphrase
+        }
 
         if env_mode == "MAINNET":
             apex_http = APEX_HTTP_MAIN
             network_id = NETWORKID_MAIN
+            endpoint = APEX_WS_MAIN
         else:
             apex_http = APEX_HTTP_TEST
             network_id = NETWORKID_TEST
+            endpoint = APEX_WS_TEST
 
         self.client = HttpPrivateStark(
             apex_http,
             network_id=network_id,
-            stark_public_key=self.stark_public_key,
-            stark_private_key=self.stark_private_key,
-            stark_public_key_y_coordinate=self.stark_public_key_y_coordinate,
-            api_key_credentials={
-                'key': self.api_key,
-                'secret': self.api_secret,
-                'passphrase': self.api_passphrase
-            }
+            stark_public_key=stark_public_key,
+            stark_private_key=stark_private_key,
+            stark_public_key_y_coordinate=stark_public_key_y_coordinate,
+            api_key_credentials=api_key_credentials,
         )
         self.configs = self.client.configs()
         self.client.get_user()
         self.client.get_account()
         self.apex_http = apex_http
 
+        # Create WebSocket with authentication
+        ws_client = WebSocket(
+            endpoint=endpoint,
+            api_key_credentials=api_key_credentials,
+        )
+
+        # subscriptions
+        ws_client.account_info_stream(self.__on_account_changed)
+        for ticker in SUPPORTED_TICKERS:
+            ws_client.ticker_stream(self.__on_ticker_changed, ticker)
+
+    def __on_ticker_changed(self, message):
+        symbol = message.get('data', {}).get('symbol')
+        last_price = message.get('data', {}).get('lastPrice')
+
+        if symbol != None and last_price != None:
+            with self.websocket_lock:
+                self.price_info[symbol] = last_price
+
+    def __on_account_changed(self, message):
+        current_orders = message['contents']['orders']
+        current_timestamp = time.time()
+
+        threshold = 60  # secconds
+
+        for order in current_orders:
+            status = order['status']
+            if status != "FILLED":
+                continue
+
+            order_id = order['orderId']
+            symbol = order['symbol']
+            order_created_at = order['createdAt'] / 1000.0
+            filled_size = order['cumSuccessFillSize']
+            filled_val = order['cumSuccessFillValue']
+            filled_fee = order['cumSuccessFillFee']
+
+            if current_timestamp - order_created_at < threshold:
+                with self.websocket_lock:
+                    if symbol not in self.processed_orders:
+                        self.processed_orders[symbol] = {}
+                    if order_id not in self.processed_orders[symbol]:
+                        self.processed_orders[symbol][order_id] = {
+                            "timestamp": current_timestamp,
+                            "filled_size": filled_size,
+                            "filled_value": filled_val,
+                            "filled_fee": filled_fee
+                        }
+
     def get_ticker(self, symbol: str):
-        endpoint = "/api/v1/ticker"
         symbol_without_hyphen = symbol.replace("-", "")
-        params = {'symbol': symbol_without_hyphen}
 
-        request_url = f"{self.apex_http}{endpoint}"
+        with self.websocket_lock:
+            data = self.price_info.copy()
 
-        try:
-            # Send the GET request with the constructed URL and params
-            response = requests.get(request_url, params=params)
-            response.raise_for_status()  # This will raise an exception for HTTP error responses
-            ret = response.json()
-
-            if 'data' in ret and ret['data']:
-                data_first_item = ret['data'][0]
-
-                if 'lastPrice' in data_first_item:
-                    return jsonify({
-                        'symbol': symbol,
-                        'price': data_first_item['lastPrice']
-                    })
-                else:
-                    error_message = 'lastPrice information is missing in the response'
-                    print(error_message, ret)
-                    return make_response(jsonify({
-                        'message': error_message
-                    }), 500)
-
-            else:
-                error_message = 'Data is missing in the response'
-                print(error_message, ret)
-                return make_response(jsonify({
-                    'message': error_message
-                }), 500)
-
-        except requests.exceptions.JSONDecodeError as e:
-            print(f"JSONDecodeError: {e}")
-            response_content = e.response.text if e.response else 'No content'
-            status_code = e.response.status_code if e.response else 'No status code'
-            print(f"HTTP Response Content: {response_content}")
-            print(f"HTTP Status Code: {status_code}")
+        if symbol_without_hyphen in data:
+            return jsonify({
+                'symbol': symbol,
+                'price': data[symbol_without_hyphen]
+            })
+        else:
+            error_message = 'lastPrice information is unknown'
             return make_response(jsonify({
-                'message': f"Could not decode JSON, HTTP Status Code: {status_code}, Content: {response_content}"
-            }), 500)
+                'message': error_message
+            }), 503)
 
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            return make_response(jsonify({
-                'message': str(e)
-            }), 500)
+    def get_filled_orders(self, symbol: str):
+        with self.websocket_lock:
+            orders_data = self.processed_orders.get(symbol, {})
+
+        orders_list = [{"order_id": order_id, **data}
+                       for order_id, data in orders_data.items()]
+        return jsonify({"orders": orders_list})
 
     def get_balance(self):
         ret = self.client.get_account_balance()
@@ -131,21 +165,6 @@ class ApexDex(AbstractDex):
         return make_response(jsonify({
             'message': 'Some required data is missing in the response'
         }), 500)
-
-    def modify_price_for_instant_fill(self, symbol: str, side: str, price: str):
-        symbolData = {}
-        for k, v in enumerate(self.configs.get('data').get('perpetualContract')):
-            if v.get('symbol') == symbol:
-                symbolData = v
-                break
-
-        price_float = float(price)
-        tick_size_float = float(symbolData.get('tickSize'))
-        if side == 'BUY':
-            price_float += tick_size_float * TICK_SIZE_MULTIPLIER
-        else:
-            price_float -= tick_size_float * TICK_SIZE_MULTIPLIER
-        return str(price_float)
 
     def create_order(self, symbol: str, size: str, side: str, price: Optional[str]):
         try:
@@ -165,8 +184,9 @@ class ApexDex(AbstractDex):
             rounded_size = round_size(size, symbolData.get('stepSize'))
             rounded_price = round_size(price, symbolData.get('tickSize'))
 
+            tick_size_float = float(symbolData.get('tickSize'))
             adjusted_price = self.modify_price_for_instant_fill(
-                symbol, side, rounded_price)
+                symbol, side, rounded_price, tick_size_float)
 
             ret = self.client.create_order(symbol=symbol, side=side,
                                            type="MARKET", size=rounded_size, price=adjusted_price, limitFeeRate=limitFeeRate,
@@ -179,30 +199,11 @@ class ApexDex(AbstractDex):
                     'message': message
                 }), 500)
 
-            id = ret['data']['orderId']
-            ret = self.client.get_order(id=id)
+            order_id = ret['data']['orderId']
 
-            if 'code' in ret:
-                code = ret['code']
-                message = ret.get('msg', '') + f" ({code})"
-                return make_response(jsonify({
-                    'message': message
-                }), 500)
-
-            if ret['data']['status'] == 'FILLED':
-                size = ret['data']['size']
-                val = ret['data']['cumSuccessFillValue']
-                fee = ret['data']['cumSuccessFillFee']
-                price_float = float(val) / float(size)
-                price = str(price_float)
-                return jsonify({
-                    'price': price,
-                    'size': size,
-                    'fee': fee,
-                })
-            else:
-                return jsonify({
-                })
+            return jsonify({
+                'order_id': order_id
+            })
 
         except Exception as e:
             print(f"An error occurred in create_order: {e}")
