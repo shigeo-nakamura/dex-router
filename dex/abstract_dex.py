@@ -11,6 +11,10 @@ class AbstractDex(ABC):
         pass
 
     @abstractmethod
+    def get_filled_orders(self, symbol: str):
+        pass
+
+    @abstractmethod
     def get_balance(self):
         pass
 

@@ -239,6 +239,9 @@ class MufexDex(AbstractDex):
             'price': price
         })
 
+    def get_filled_orders(self, symbol: str):
+        raise Exception("Not implemented")
+
     def get_balance(self):
         endpoint = "/private/v1/account/balance"
         signature, timestamp, recv_window = self.__generate_signature()

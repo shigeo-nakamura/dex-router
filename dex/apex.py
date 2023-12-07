@@ -14,6 +14,7 @@ import time
 from .kms_decrypt import get_decrypted_env
 import requests
 from typing import Optional
+import threading
 
 TICK_SIZE_MULTIPLIER = 10
 
@@ -21,7 +22,7 @@ SUPPORTED_TICKERS = ['BTCUSDC', 'ETHUSDC', 'SOLUSDC', 'AVAXUSDC',
                      'ARBUSDC', 'XRPUSDC', 'MATICUSDC', 'OPUSDC', 'SOLUSDC', 'BNBUSDC']
 
 latest_price_info = {}
-processed_orders = set()
+processed_orders = {}  # {'symbol': {'order_id': timestamp, ...}, ...}
 websocket_lock = threading.Lock()
 
 
@@ -37,13 +38,49 @@ def on_ticker_changed(message):
 
 def on_account_changed(message):
     current_orders = message['contents']['orders']
+    current_timestamp = time.time()
+
+    threshold = 60  # secconds
+
     for order in current_orders:
         order_id = order['orderId']
         current_status = order['status']
+        order_symbol = order['symbol']
+        order_created_at = order['createdAt'] / 1000.0
 
-        with websocket_lock:
-            if order_id not in processed_orders:
-                processed_orders.add(order_id)
+        if current_timestamp - order_created_at < threshold:
+            with websocket_lock:
+                if order_symbol not in processed_orders:
+                    processed_orders[order_symbol] = {}
+                if order_id not in processed_orders[order_symbol]:
+                    processed_orders[order_symbol][order_id] = current_timestamp
+
+
+def cleanup_processed_orders(expiration_time):
+    current_timestamp = time.time()
+    with websocket_lock:
+        for symbol in list(processed_orders.keys()):
+            for order_id in list(processed_orders[symbol].keys()):
+                if current_timestamp - processed_orders[symbol][order_id] > expiration_time:
+                    del processed_orders[symbol][order_id]
+            if not processed_orders[symbol]:
+                del processed_orders[symbol]
+
+
+def schedule_cleanup(expiration_time=300):
+    cleanup_processed_orders(expiration_time)
+    threading.Timer(expiration_time, schedule_cleanup).start()
+
+
+def cleanup_processed_orders(expiration_time):
+    current_timestamp = time.time()
+    with websocket_lock:
+        for symbol in list(processed_orders.keys()):
+            for order_id in list(processed_orders[symbol].keys()):
+                if current_timestamp - processed_orders[symbol][order_id] > expiration_time:
+                    del processed_orders[symbol][order_id]
+            if not processed_orders[symbol]:
+                del processed_orders[symbol]
 
 
 class ApexDex(AbstractDex):
@@ -110,8 +147,10 @@ class ApexDex(AbstractDex):
         for ticker in SUPPORTED_TICKERS:
             ws_client.ticker_stream(on_ticker_changed, ticker)
 
+        # schedule a timer
+        schedule_cleanup()
+
     def get_ticker(self, symbol: str):
-        endpoint = "/api/v1/ticker"
         symbol_without_hyphen = symbol.replace("-", "")
 
         with websocket_lock:
@@ -127,6 +166,12 @@ class ApexDex(AbstractDex):
             return make_response(jsonify({
                 'message': error_message
             }), 503)
+
+    def get_filled_orders(self, symbol: str):
+        with websocket_lock:
+            orders = processed_orders.get(symbol, {})
+        orders_list = list(orders.keys())
+        return jsonify({"orders": orders_list})
 
     def get_balance(self):
         ret = self.client.get_account_balance()
