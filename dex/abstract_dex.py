@@ -28,7 +28,7 @@ class AbstractDex(ABC):
         with self.websocket_lock:
             for symbol in list(self.processed_orders.keys()):
                 for order_id in list(self.processed_orders[symbol].keys()):
-                    if current_timestamp - self.processed_orders[symbol][order_id] > expiration_time:
+                    if current_timestamp - self.processed_orders[symbol][order_id]["timestamp"] > expiration_time:
                         del self.processed_orders[symbol][order_id]
                 if not self.processed_orders[symbol]:
                     del self.processed_orders[symbol]
