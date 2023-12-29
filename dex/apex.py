@@ -230,6 +230,8 @@ class ApexDex(AbstractDex):
                 symbol, side = key.split('_')
                 if close_symbol is None or symbol == close_symbol:
                     opposite_order_side = 'SELL' if side == 'LONG' else 'BUY'
+                else:
+                    continue
 
                 ticker_response = self.get_ticker(symbol)
                 if ticker_response.status_code == 200:
