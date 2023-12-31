@@ -33,7 +33,7 @@ class AbstractDex(ABC):
                 if not self.processed_orders[symbol]:
                     del self.processed_orders[symbol]
 
-    def __schedule_cleanup(self, expiration_time=60):
+    def __schedule_cleanup(self, expiration_time=10):
         self.__cleanup_processed_orders(expiration_time)
         self.cleanup_timer = threading.Timer(
             expiration_time, self.__schedule_cleanup)
