@@ -6,7 +6,7 @@ import threading
 import time
 from typing import Optional
 
-TICK_SIZE_MULTIPLIER = 10
+TICK_PRICE_MULTIPLIER = 0.1
 
 
 class AbstractDex(ABC):
@@ -39,12 +39,12 @@ class AbstractDex(ABC):
             expiration_time, self.__schedule_cleanup)
         self.cleanup_timer.start()
 
-    def modify_price_for_instant_fill(self, symbol: str, side: str, price: str, tick_size: float):
+    def modify_price_for_instant_fill(self, symbol: str, side: str, price: str):
         price_float = float(price)
         if side == 'BUY':
-            price_float += tick_size * TICK_SIZE_MULTIPLIER
+            price_float *= (1.0 + TICK_PRICE_MULTIPLIER)
         else:
-            price_float -= tick_size * TICK_SIZE_MULTIPLIER
+            price_float *= (1.0 - TICK_PRICE_MULTIPLIER)
         return str(price_float)
 
     @abstractmethod

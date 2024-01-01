@@ -182,14 +182,15 @@ class ApexDex(AbstractDex):
                     break
 
             rounded_size = round_size(size, symbolData.get('stepSize'))
-            rounded_price = round_size(price, symbolData.get('tickSize'))
 
-            tick_size_float = float(symbolData.get('tickSize'))
             adjusted_price = self.modify_price_for_instant_fill(
-                symbol, side, rounded_price, tick_size_float)
+                symbol, side, price)
+
+            rounded_price = round_size(
+                adjusted_price, symbolData.get('tickSize'))
 
             ret = self.client.create_order(symbol=symbol, side=side,
-                                           type="MARKET", size=rounded_size, price=adjusted_price, limitFeeRate=limitFeeRate,
+                                           type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
                                            expirationEpochSeconds=currentTime)
 
             if 'code' in ret:
