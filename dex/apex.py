@@ -172,6 +172,9 @@ class ApexDex(AbstractDex):
                 worstPrice = self.client.get_worst_price(
                     symbol=symbol, side=side, size=size)
                 price = worstPrice['data']['worstPrice']
+                price = self.modify_price_for_instant_fill(
+                    symbol, side, price)
+
             currentTime = time.time()
             limitFeeRate = self.client.account['takerFeeRate']
 
@@ -183,11 +186,7 @@ class ApexDex(AbstractDex):
 
             rounded_size = round_size(size, symbolData.get('stepSize'))
 
-            adjusted_price = self.modify_price_for_instant_fill(
-                symbol, side, price)
-
-            rounded_price = round_size(
-                adjusted_price, symbolData.get('tickSize'))
+            rounded_price = round_size(price, symbolData.get('tickSize'))
 
             ret = self.client.create_order(symbol=symbol, side=side,
                                            type="MARKET", size=rounded_size, price=rounded_price, limitFeeRate=limitFeeRate,
