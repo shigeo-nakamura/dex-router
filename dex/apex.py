@@ -233,14 +233,7 @@ class ApexDex(AbstractDex):
                 else:
                     continue
 
-                ticker_response = self.get_ticker(symbol)
-                if ticker_response.status_code == 200:
-                    price_data = ticker_response.get_json()
-                    price = price_data.get('price', None)
-                else:
-                    price = None
-
-                self.create_order(symbol, size, opposite_order_side, price)
+                self.create_order(symbol, size, opposite_order_side, None)
 
             return jsonify({
             })
