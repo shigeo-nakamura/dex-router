@@ -49,10 +49,11 @@ class AbstractDex(ABC):
 
     def clear_filled_order(self, symbol: str, order_id: str):
         with self.websocket_lock:
-            if order_id in list(self.processed_orders[symbol].keys()):
-                del self.processed_orders[symbol][order_id]
-                if not self.processed_orders[symbol]:
-                    del self.processed_orders[symbol]
+            if symbol in list(self.processed_orders.keys()):
+                if order_id in list(self.processed_orders[symbol].keys()):
+                    del self.processed_orders[symbol][order_id]
+                    if not self.processed_orders[symbol]:
+                        del self.processed_orders[symbol]
 
     @abstractmethod
     def get_ticker(self, symbol: str):

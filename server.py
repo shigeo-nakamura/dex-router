@@ -97,7 +97,7 @@ def clear_filled_order():
     order_id = data.get('order_id')
 
     dex = get_dex(request)
-    dex.super().clear_filled_order(symbol, order_id)
+    dex.clear_filled_order(symbol, order_id)
     return jsonify({})
 
 # POST /create-order
