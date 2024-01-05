@@ -83,6 +83,23 @@ def get_balance():
     dex = get_dex(request)
     return dex.get_balance()
 
+# POST /clear-filled-order
+@app.route('/clear-filled-order', methods=['POST'])
+def clear_filled_order():
+    data = request.json
+
+    if 'symbol' not in data or 'order_id' not in data:
+        return jsonify({
+            'message': 'Missing required parameters: symbol or order_id.'
+        }), 400
+
+    symbol = data.get('symbol')
+    order_id = data.get('order_id')
+
+    dex = get_dex(request)
+    dex.super().clear_filled_order(symbol, order_id)
+    return jsonify({})
+
 # POST /create-order
 @app.route('/create-order', methods=['POST'])
 def create_order():

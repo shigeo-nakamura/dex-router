@@ -47,6 +47,13 @@ class AbstractDex(ABC):
             price_float *= (1.0 - TICK_PRICE_MULTIPLIER)
         return str(price_float)
 
+    def clear_filled_order(self, symbol: str, order_id: str):
+        with self.websocket_lock:
+            if order_id in list(self.processed_orders[symbol].keys()):
+                del self.processed_orders[symbol][order_id]
+                if not self.processed_orders[symbol]:
+                    del self.processed_orders[symbol]
+
     @abstractmethod
     def get_ticker(self, symbol: str):
         pass
