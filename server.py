@@ -118,8 +118,23 @@ def create_order():
     dex = get_dex(request)
     return dex.create_order(symbol, size, side, price)
 
-# POST /close_all_positions
-@app.route('/close_all_positions', methods=['POST'])
+# POST /cancel-order
+@app.route('/cancel-order', methods=['POST'])
+def cancel_order():
+    data = request.json
+
+    if 'order_id' not in data:
+        return jsonify({
+            'message': 'Missing required parameters: order_id.'
+        }), 400
+
+    order_id = data.get('order_id')
+
+    dex = get_dex(request)
+    return dex.cancel_order(order_id)
+
+# POST /close-all-positions
+@app.route('/close-all-positions', methods=['POST'])
 def close_all_positions():
     data = request.json
 

@@ -72,5 +72,9 @@ class AbstractDex(ABC):
         pass
 
     @abstractmethod
+    def cancel_order(self, order_id: str):
+        pass
+
+    @abstractmethod
     def close_all_positions(self, symbol: str):
         pass

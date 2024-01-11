@@ -211,6 +211,18 @@ class ApexDex(AbstractDex):
                 'message': str(e)
             }), 500)
 
+    def cancel_order(self, order_id):
+        ret = self.client.delete_order(order_id=order_id)
+
+        if 'code' in ret:
+            code = ret['code']
+            message = ret.get('msg', '') + f" ({code})"
+            return make_response(jsonify({
+                'message': message
+            }), 500)
+
+        return jsonify({})
+
     def close_all_positions(self, close_symbol):
         account_data = self.client.get_account()
         position_sizes = {}

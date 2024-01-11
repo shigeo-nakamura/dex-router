@@ -300,6 +300,9 @@ class MufexDex(AbstractDex):
             else:
                 return jsonify({})
 
+    def cancel_order(self, order_id):
+        raise Exception("Not implemented")
+
     def close_all_positions(self, close_symbol):
         response = self.__get_positions(close_symbol)
         if response.is_error():
