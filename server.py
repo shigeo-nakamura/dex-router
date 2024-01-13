@@ -33,6 +33,9 @@ DEX_ROUTER_API_KEY = get_decrypted_env('DEX_ROUTER_API_KEY')
 def signal_handler(signum, frame):
     global shutdown_requested
     shutdown_requested = True
+    for dex_instance in dex_instances.values():
+        dex_instance.shutdown()
+
 
 signal.signal(signal.SIGTERM, signal_handler)
 
@@ -43,8 +46,6 @@ def get_dex(request):
 @app.before_request
 def check_shutdown():
     if shutdown_requested:
-        for dex_instance in dex_instances.values():
-            dex_instance.cleanup_timer()
         return jsonify({"message": "Server is shutting down"}), 503
 
 @app.before_request

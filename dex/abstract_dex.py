@@ -76,3 +76,7 @@ class AbstractDex(ABC):
     @abstractmethod
     def close_all_positions(self, symbol: str):
         pass
+
+    @abstractmethod
+    def shutdown(self):
+        pass

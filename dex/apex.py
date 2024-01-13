@@ -76,15 +76,20 @@ class ApexDex(AbstractDex):
         self.apex_http = apex_http
 
         # Create WebSocket with authentication
-        ws_client = WebSocket(
+        self.ws_client = WebSocket(
             endpoint=endpoint,
             api_key_credentials=api_key_credentials,
         )
 
         # subscriptions
-        ws_client.account_info_stream(self.__on_account_changed)
+        self.ws_client.account_info_stream(self.__on_account_changed)
         for ticker in SUPPORTED_TICKERS:
-            ws_client.ticker_stream(self.__on_ticker_changed, ticker)
+            self.ws_client.ticker_stream(self.__on_ticker_changed, ticker)
+
+    def shutdown(self):
+        super().cleanup_timer()
+        self.ws_client.ws_private = None
+        self.ws_client.ws_public = None
 
     def __on_ticker_changed(self, message):
         symbol = message.get('data', {}).get('symbol')

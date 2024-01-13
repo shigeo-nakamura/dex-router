@@ -65,6 +65,9 @@ class MufexDex(AbstractDex):
         else:
             self.mufex_http = MUFEX_HTTP_TEST
 
+    def shutdown(self):
+        pass
+
     def __send_get_request(self, endpoint, params=None, headers=None):
         request_url = f"{self.mufex_http}{endpoint}"
         try:
