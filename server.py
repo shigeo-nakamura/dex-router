@@ -7,8 +7,10 @@ from dex.apex import ApexDex
 from dex.mufex import MufexDex
 from dex.kms_decrypt import get_decrypted_env
 import logging
+import signal
 
 app = Flask(__name__)
+shutdown_requested = False
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -20,7 +22,7 @@ supported_dex_names = os.environ.get(
 
 dex_classes = {
     'apex': ApexDex,
-    'mufex': MufexDex
+    # 'mufex': MufexDex
 }
 
 dex_instances = {dex_name: dex_classes[dex_name](
@@ -28,9 +30,22 @@ dex_instances = {dex_name: dex_classes[dex_name](
 
 DEX_ROUTER_API_KEY = get_decrypted_env('DEX_ROUTER_API_KEY')
 
+def signal_handler(signum, frame):
+    global shutdown_requested
+    shutdown_requested = True
+
+signal.signal(signal.SIGTERM, signal_handler)
+
 def get_dex(request):
     dex_name = request.args.get('dex')
     return dex_instances.get(dex_name)
+
+@app.before_request
+def check_shutdown():
+    if shutdown_requested:
+        for dex_instance in dex_instances.values():
+            dex_instance.cleanup_timer()
+        return jsonify({"message": "Server is shutting down"}), 503
 
 @app.before_request
 def check_api_key():

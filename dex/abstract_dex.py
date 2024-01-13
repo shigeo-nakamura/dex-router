@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from abc import ABC, abstractmethod
-import signal
 import threading
 import time
 from typing import Optional
@@ -15,13 +14,12 @@ class AbstractDex(ABC):
         self.price_info = {}
         self.processed_orders = {}  # {'symbol': {'order_id': timestamp, ...}, ...}
         self.websocket_lock = threading.Lock()
-        self.cleanup_timer = None
+        self.cleanup_timer_thread = None
         self.__schedule_cleanup()
-        signal.signal(signal.SIGTERM, self.signal_handler)
 
-    def signal_handler(self, signum, frame):
-        if self.cleanup_timer:
-            self.cleanup_timer.cancel()
+    def cleanup_timer(self):
+        if self.cleanup_timer_thread:
+            self.cleanup_timer_thread.cancel()
 
     def __cleanup_processed_orders(self, expiration_time):
         current_timestamp = time.time()
@@ -35,9 +33,9 @@ class AbstractDex(ABC):
 
     def __schedule_cleanup(self, expiration_time=10):
         self.__cleanup_processed_orders(expiration_time)
-        self.cleanup_timer = threading.Timer(
+        self.cleanup_timer_thread = threading.Timer(
             expiration_time, self.__schedule_cleanup)
-        self.cleanup_timer.start()
+        self.cleanup_timer_thread.start()
 
     def modify_price_for_instant_fill(self, symbol: str, side: str, price: str):
         price_float = float(price)
